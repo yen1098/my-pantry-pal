@@ -1,0 +1,1885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#6A8F6A">
+<title>My Pantry Pal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+:root {
+  --green:#6A8F6A; --green-d:#4A6B4A; --green-l:rgba(106,143,106,.10); --green-b:rgba(106,143,106,.22);
+  --red:#B85C5C;   --red-l:rgba(184,92,92,.09);
+  --teal:#4A7A8A;  --teal-l:rgba(74,122,138,.10);
+  --amber:#B07800; --amber-l:rgba(176,120,0,.09);
+  --bg:#F4F7F4; --surface:#fff; --surface2:#F8FAF8;
+  --border:#E2EAE2; --text:#1B2A1B; --text2:#4E5E4E; --text3:#8A9A8A;
+  --r:14px; --r-sm:9px; --r-lg:22px; --r-xl:28px;
+  --nav:64px; --shadow:0 2px 14px rgba(0,0,0,.07);
+  --font:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;overscroll-behavior:none}
+button{font-family:var(--font);cursor:pointer;border:none;background:none}
+input,select,textarea{font-family:var(--font)}
+a{text-decoration:none;color:inherit}
+
+#app{height:100%;max-width:430px;margin:0 auto;position:relative;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── LOADING ── */
+#loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface);z-index:999;gap:16px}
+#loading .logo{font-size:28px;font-weight:800;color:var(--green)}
+.spinner{width:32px;height:32px;border:3px solid var(--green-l);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── SETUP SCREEN ── */
+#setup{position:absolute;inset:0;background:var(--surface);z-index:998;padding:32px 24px;overflow-y:auto}
+#setup h1{font-size:24px;font-weight:800;color:var(--green);margin-bottom:6px}
+#setup p{color:var(--text2);font-size:14px;margin-bottom:20px}
+#setup ol{padding-left:20px;color:var(--text2);font-size:14px;line-height:2}
+#setup code{background:var(--bg);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:13px;color:var(--green-d)}
+.setup-inputs{margin-top:24px;display:flex;flex-direction:column;gap:12px}
+.setup-inputs label{font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px}
+.setup-inputs input{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:14px;outline:none;transition:.2s}
+.setup-inputs input:focus{border-color:var(--green)}
+.sql-block{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px;margin:16px 0;font-family:monospace;font-size:11px;color:var(--text2);white-space:pre-wrap;overflow-x:auto;line-height:1.6;max-height:200px;overflow-y:auto}
+
+/* ── MAIN APP ── */
+#main-app{display:none;flex-direction:column;height:100%}
+#tab-content{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:8px}
+
+/* ── BOTTOM NAV ── */
+#bottom-nav{height:var(--nav);background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:center;flex-shrink:0}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 0;color:var(--text3);transition:.15s;position:relative}
+.nav-btn.active{color:var(--green)}
+.nav-btn svg{width:22px;height:22px;stroke-width:1.8}
+.nav-btn span{font-size:10px;font-weight:500}
+.nav-badge{position:absolute;top:4px;right:calc(50% - 18px);background:var(--red);color:#fff;border-radius:99px;font-size:9px;font-weight:700;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.nav-badge.teal{background:var(--teal)}
+
+/* ── SCREEN PADDING ── */
+.screen{padding:20px 16px}
+
+/* ── SECTION HEADERS ── */
+.screen-title{font-size:22px;font-weight:800;color:var(--text);margin-bottom:16px}
+.section-label{font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin:20px 0 8px}
+
+/* ── CARDS ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;box-shadow:var(--shadow)}
+.card+.card{margin-top:10px}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 20px;border-radius:var(--r-sm);font-size:15px;font-weight:600;transition:.15s;cursor:pointer;border:none}
+.btn-primary{background:var(--green);color:#fff}
+.btn-primary:active{background:var(--green-d)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-teal{background:var(--teal);color:#fff}
+.btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--text2)}
+.btn-outline:active{background:var(--bg)}
+.btn-ghost{background:transparent;color:var(--text2);padding:8px 12px;font-size:14px}
+.btn-full{width:100%}
+.btn-icon{width:36px;height:36px;padding:0;border-radius:var(--r-sm);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center}
+.btn-icon svg{width:15px;height:15px;stroke:var(--text2)}
+.btn-icon.danger svg{stroke:var(--red)}
+.btn-icon.teal svg{stroke:var(--teal)}
+.btn svg{width:16px;height:16px;stroke-width:2.2;flex-shrink:0}
+.btn-row{display:flex;gap:10px;margin-top:16px}
+.btn-row .btn{flex:1}
+
+/* ── INPUTS ── */
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.field label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
+.input{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:15px;font-weight:500;color:var(--text);background:var(--surface2);outline:none;transition:.15s;-webkit-appearance:none}
+.input:focus{border-color:var(--green);background:var(--surface)}
+.input[readonly]{opacity:.7;cursor:default}
+select.input{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%238A9A8A' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px}
+textarea.input{resize:vertical;min-height:72px}
+.search-wrap{position:relative;margin-bottom:12px}
+.search-wrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;stroke:var(--text3);pointer-events:none}
+.search-wrap input{padding-left:38px}
+
+/* ── HOME ── */
+.home-title{font-size:30px;font-weight:800;color:var(--green);text-align:center;letter-spacing:-.3px;padding-top:8px}
+.home-sub{font-size:13px;color:var(--text3);text-align:center;margin-bottom:20px}
+.home-btns{display:flex;flex-direction:column;gap:14px;margin-bottom:20px}
+.home-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border-radius:var(--r-xl);padding:28px;border:none;cursor:pointer;transition:.12s;flex:1}
+.home-btn:active{transform:scale(.98)}
+.home-btn.add{background:var(--green)}
+.home-btn.consume{background:var(--red)}
+.home-btn svg{width:48px;height:48px;stroke:#fff;stroke-width:1.6}
+.home-btn span{font-size:18px;font-weight:700;color:#fff}
+.dashboard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;box-shadow:var(--shadow)}
+.dashboard h3{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px}
+.dash-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.dash-stat{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:10px 6px;border-radius:var(--r-sm);transition:.12s}
+.dash-stat:active{background:var(--bg)}
+.dash-stat .val{font-size:26px;font-weight:800;line-height:1}
+.dash-stat .lbl{font-size:10px;font-weight:600;color:var(--text3);text-align:center}
+.dash-stat.green .val{color:var(--green)}
+.dash-stat.red .val{color:var(--red)}
+.dash-stat.amber .val{color:var(--amber)}
+.dash-divider{border-top:1px solid var(--border);margin-bottom:12px}
+.dash-last{display:flex;gap:6px;font-size:13px;color:var(--text2)}
+.dash-last span{font-weight:600;color:var(--text)}
+
+/* ── INVENTORY ── */
+.inv-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.inv-header h2{font-size:22px;font-weight:800}
+.filter-row{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--surface);color:var(--text2);transition:.12s}
+.chip.active{background:var(--green-l);border-color:var(--green);color:var(--green)}
+.chip svg{width:12px;height:12px;stroke:currentColor}
+.inv-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.inv-grid .cat-header{grid-column:1/-1;font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.08em;padding-top:8px}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px;cursor:pointer;transition:.12s;box-shadow:var(--shadow)}
+.tile:active{transform:scale(.98)}
+.tile.expanded{grid-column:1/-1;border-color:var(--green-b);border-left:3px solid var(--green)}
+.tile-name{font-size:14px;font-weight:700;color:var(--text);line-height:1.3;margin-bottom:2px}
+.tile-barcode{font-size:10px;color:var(--text3);margin-bottom:4px;font-family:monospace}
+.tile-qty{font-size:12px;color:var(--text2);font-weight:500}
+.tile-batches{margin-top:10px;border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px}
+.batch-row{display:flex;align-items:center;gap:8px;font-size:12px}
+.batch-info{flex:1}
+.batch-info .b-item{font-weight:600;color:var(--text)}
+.batch-info .b-exp{color:var(--text3);margin-top:1px}
+.batch-qty{font-weight:700;color:var(--green);min-width:32px;text-align:right}
+.empty-state{text-align:center;padding:48px 24px;color:var(--text3)}
+.empty-state svg{width:40px;height:40px;stroke:var(--border);margin-bottom:12px}
+.empty-state p{font-size:15px;font-weight:600;color:var(--text2);margin-bottom:4px}
+.empty-state span{font-size:13px}
+
+/* ── ALERTS ── */
+.alert-section-title{font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 8px}
+.alert-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;box-shadow:var(--shadow);margin-bottom:10px}
+.alert-card.expired{background:var(--red-l);border-color:rgba(184,92,92,.3)}
+.alert-card.expiring{background:var(--amber-l);border-color:rgba(176,120,0,.3)}
+.alert-card.lowstock{background:var(--red-l);border-color:rgba(184,92,92,.2)}
+.alert-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.alert-name{font-size:15px;font-weight:700}
+.alert-cat{font-size:12px;color:var(--text3)}
+.alert-badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px}
+.alert-badge.expired{background:var(--red);color:#fff}
+.alert-badge.soon{background:var(--amber);color:#fff}
+.alert-badge.low{background:var(--red);color:#fff}
+.alert-detail{font-size:12px;color:var(--text2);margin-bottom:12px}
+.alert-actions{display:flex;gap:8px}
+.alert-actions .btn{flex:1;padding:9px 8px;font-size:12px}
+
+/* ── UTILITIES ── */
+.util-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.util-header h2{font-size:22px;font-weight:800;color:var(--teal)}
+.util-add-btn{width:46px;height:46px;border-radius:50%;background:var(--teal);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);border:none;cursor:pointer;transition:.12s}
+.util-add-btn:active{transform:scale(.95)}
+.util-add-btn svg{width:22px;height:22px;stroke:#fff;stroke-width:2.2}
+.util-card{background:var(--surface);border:1.5px solid rgba(74,122,138,.2);border-radius:var(--r);padding:14px;margin-bottom:12px;box-shadow:var(--shadow)}
+.util-card.due{background:var(--red-l);border-color:rgba(184,92,92,.3)}
+.util-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+.util-name-wrap{display:flex;align-items:center;gap:8px}
+.util-name{font-size:16px;font-weight:700;color:var(--teal)}
+.util-card.due .util-name{color:var(--red)}
+.util-type{font-size:11px;color:var(--teal);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.due-tag{font-size:9px;font-weight:700;background:var(--red);color:#fff;padding:2px 7px;border-radius:99px;letter-spacing:.03em}
+.util-actions{display:flex;gap:6px}
+.util-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0}
+.util-row .lbl{color:var(--text3)}
+.util-row .val{font-weight:600;color:var(--text2)}
+.util-row .val.link{color:var(--teal);text-decoration:underline;cursor:pointer}
+.util-row .val.copy{color:var(--teal);cursor:pointer}
+.util-freq{font-size:11px;color:var(--text3);margin-top:8px}
+.util-edit-form{margin-top:12px;border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:8px}
+
+/* ── SETTINGS ── */
+.settings-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.settings-section h3{font-size:14px;font-weight:700;margin-bottom:4px}
+.settings-section p{font-size:12px;color:var(--text3);margin-bottom:14px}
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--border)}
+.settings-row:first-of-type{border-top:none;padding-top:0}
+.settings-row label{font-size:14px;font-weight:500}
+.settings-row .sub{font-size:12px;color:var(--text3);margin-top:1px}
+.cat-list{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.cat-item{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--bg);border-radius:var(--r-sm);font-size:14px;font-weight:500}
+.cat-item .def-tag{font-size:10px;background:var(--border);color:var(--text3);padding:2px 6px;border-radius:99px}
+
+/* ── MODAL OVERLAY ── */
+#modal-overlay{position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:100;display:none;align-items:flex-end;justify-content:center}
+#modal-overlay.open{display:flex}
+#modal-box{background:var(--surface);border-radius:var(--r-lg) var(--r-lg) 0 0;width:100%;max-height:92vh;overflow-y:auto;padding:20px 20px 32px;animation:slideUp .22s ease-out}
+@keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-handle{width:40px;height:4px;background:var(--border);border-radius:99px;margin:0 auto 20px}
+.modal-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.modal-title{font-size:18px;font-weight:800}
+.modal-close{width:32px;height:32px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;cursor:pointer;border:none}
+.modal-close svg{width:15px;height:15px;stroke:var(--text2)}
+
+/* ── SCAN OVERLAY ── */
+#scan-overlay{position:absolute;inset:0;background:#000;z-index:200;display:none;flex-direction:column}
+#scan-overlay.open{display:flex}
+#scan-video{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
+.scan-ui{position:relative;z-index:1;display:flex;flex-direction:column;height:100%;padding:20px}
+.scan-top{display:flex;justify-content:space-between;align-items:center}
+.scan-torch-btn{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;border:none;cursor:pointer}
+.scan-torch-btn svg{width:20px;height:20px;stroke:#fff}
+.scan-torch-btn.on{background:rgba(255,215,0,.35)}
+.scan-torch-btn.on svg{stroke:#FFD700}
+.scan-cancel{font-size:16px;font-weight:600;color:#fff;background:transparent;border:none;cursor:pointer}
+.scan-middle{flex:1;display:flex;align-items:center;justify-content:center}
+.scan-frame{width:230px;height:230px;border:2px solid rgba(255,255,255,.7);border-radius:20px;position:relative}
+.scan-frame::before,.scan-frame::after{content:'';position:absolute;width:24px;height:24px;border-color:#fff;border-style:solid;border-width:0}
+.scan-frame::before{top:-2px;left:-2px;border-top-width:3px;border-left-width:3px;border-radius:8px 0 0 0}
+.scan-frame::after{bottom:-2px;right:-2px;border-bottom-width:3px;border-right-width:3px;border-radius:0 0 8px 0}
+/* html5-qrcode overrides — hide its default UI, keep only the video */
+#scan-reader{position:absolute;inset:0;overflow:hidden}
+#scan-reader video{width:100%!important;height:100%!important;object-fit:cover!important;border:none!important}
+#scan-reader img{display:none!important}
+#scan-reader button{display:none!important}
+#scan-reader select{display:none!important}
+#scan-reader>div>div:not([style*="border"]){display:none!important}
+.scan-bottom{text-align:center;padding-bottom:20px}
+.scan-hint{color:rgba(255,255,255,.7);font-size:13px;margin-bottom:14px}
+.scan-manual-btn{background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.4);color:#fff;padding:11px 22px;border-radius:var(--r-sm);font-size:14px;font-weight:600;cursor:pointer}
+
+/* ── SUCCESS OVERLAY ── */
+#success-overlay{position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:300;display:none;align-items:center;justify-content:center}
+#success-overlay.open{display:flex}
+.success-card{background:var(--surface);border-radius:var(--r-xl);padding:40px 48px;text-align:center;position:relative;animation:popIn .3s cubic-bezier(.34,1.56,.64,1)}
+@keyframes popIn{from{transform:scale(.82);opacity:0}to{transform:scale(1);opacity:1}}
+.success-x{position:absolute;top:14px;right:14px;width:30px;height:30px;border-radius:50%;background:var(--bg);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.success-x svg{width:14px;height:14px;stroke:var(--text3)}
+.success-circle{width:100px;height:100px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
+.success-circle svg{width:56px;height:56px;stroke:#fff;stroke-width:2}
+.success-text{font-size:24px;font-weight:800;color:var(--green)}
+
+/* ── CONFIRM MODAL ── */
+.confirm-icon{width:56px;height:56px;border-radius:50%;background:var(--red-l);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.confirm-icon svg{width:26px;height:26px;stroke:var(--red)}
+.confirm-q{font-size:17px;font-weight:700;text-align:center;margin-bottom:6px}
+.confirm-sub{font-size:13px;color:var(--text3);text-align:center;margin-bottom:20px}
+
+/* ── POPUP MODAL ── */
+.popup-list{display:flex;flex-direction:column;gap:0;max-height:380px;overflow-y:auto}
+.popup-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border)}
+.popup-row:last-child{border-bottom:none}
+.popup-row .pname{font-size:14px;font-weight:600}
+.popup-row .pcat{font-size:12px;color:var(--text3)}
+.popup-row .pval{font-size:13px;font-weight:700}
+.popup-row .snoozed-tag{font-size:9px;background:var(--border);color:var(--text3);padding:2px 6px;border-radius:99px;margin-left:5px}
+
+/* ── FORM SECTIONS ── */
+.date-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.year-row{margin-top:8px}
+.qty-stepper{display:flex;align-items:center;justify-content:center;gap:20px;margin:8px 0}
+.qty-btn{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;transition:.12s}
+.qty-btn:active{transform:scale(.93)}
+.qty-btn.minus{background:var(--red)}
+.qty-btn.plus{background:var(--green)}
+.qty-btn svg{width:26px;height:26px;stroke:#fff;stroke-width:2.5}
+.qty-display{font-size:36px;font-weight:800;min-width:60px;text-align:center;color:var(--text)}
+.product-name-big{font-size:22px;font-weight:800;text-align:center;margin-bottom:4px;line-height:1.3}
+.product-barcode-small{font-size:12px;color:var(--text3);text-align:center;font-family:monospace;margin-bottom:16px}
+.stock-info-row{display:flex;justify-content:space-between;padding:10px 14px;background:var(--bg);border-radius:var(--r-sm);font-size:14px;margin-bottom:16px}
+
+/* ── LOGS ── */
+.log-row{display:flex;align-items:flex-start;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border)}
+.log-row:last-child{border-bottom:none}
+.log-name{font-size:14px;font-weight:600}
+.log-meta{font-size:11px;color:var(--text3);margin-top:2px}
+.log-action{text-align:right}
+.log-action .act{font-size:13px;font-weight:700}
+.log-action .act.add{color:var(--green)}
+.log-action .act.consume{color:var(--red)}
+.log-action .qty{font-size:12px;color:var(--text3)}
+
+/* ── TYPE TOGGLE ── */
+.type-toggle{display:flex;background:var(--bg);border-radius:var(--r-sm);padding:3px;gap:3px;margin-bottom:12px}
+.type-btn{flex:1;padding:9px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;background:transparent;color:var(--text2)}
+.type-btn.active{background:var(--surface);color:var(--teal);box-shadow:var(--shadow)}
+
+/* ── MISC ── */
+.divider{border:none;border-top:1px solid var(--border);margin:14px 0}
+.green-close-btn{background:var(--green);color:#fff;border:none;border-radius:var(--r-sm);padding:13px;width:100%;font-size:15px;font-weight:700;cursor:pointer;margin-top:14px;display:flex;align-items:center;justify-content:center;gap:8px}
+.green-close-btn svg{width:16px;height:16px;stroke:#fff}
+.hint{font-size:12px;color:var(--text3);margin-top:4px}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Loading -->
+  <div id="loading">
+    <div class="logo">🥦 My Pantry Pal</div>
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Setup screen (shown if Supabase not configured) -->
+  <div id="setup" style="display:none">
+    <h1>🥦 My Pantry Pal</h1>
+    <p>Connect to Supabase to sync data across all your devices.</p>
+    <strong style="font-size:13px;color:var(--text)">Step 1 — Create a free Supabase account</strong>
+    <p style="margin-top:4px">Go to <code>supabase.com</code>, sign up, and create a new project.</p>
+    <strong style="font-size:13px;color:var(--text);display:block;margin-top:12px">Step 2 — Run this SQL in Supabase → SQL Editor</strong>
+    <div class="sql-block" id="setup-sql"></div>
+    <strong style="font-size:13px;color:var(--text);display:block;margin-top:12px">Step 3 — Paste your keys below</strong>
+    <p style="margin-top:4px">Go to Supabase → Settings → API to find your URL and anon key.</p>
+    <div class="setup-inputs">
+      <div>
+        <label>Supabase Project URL</label>
+        <input id="setup-url" placeholder="https://xxxx.supabase.co" class="input">
+      </div>
+      <div>
+        <label>Supabase Anon Key</label>
+        <input id="setup-key" placeholder="eyJ..." class="input">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="saveSetup()" style="margin-top:4px">
+        Connect & Start
+      </button>
+    </div>
+  </div>
+
+  <!-- Scan overlay -->
+  <div id="scan-overlay">
+    <div id="scan-reader"></div>
+    <div class="scan-ui">
+      <div class="scan-top">
+        <button class="scan-torch-btn" id="torch-btn" onclick="toggleTorch()">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M8 2h8l-2 7h4l-8 13V14H6L8 2Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="scan-cancel" onclick="closeScan()">Cancel</button>
+      </div>
+      <div class="scan-middle">
+        <div class="scan-frame"></div>
+      </div>
+      <div class="scan-bottom">
+        <p class="scan-hint">Point camera at barcode</p>
+        <button class="scan-manual-btn" onclick="showManualScan()">Enter code manually</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Success overlay -->
+  <div id="success-overlay">
+    <div class="success-card">
+      <button class="success-x" onclick="dismissSuccess()">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+      <div class="success-circle">
+        <svg viewBox="0 0 24 24" fill="none"><polyline points="20 6 9 17 4 12" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <p class="success-text">Done!</p>
+    </div>
+  </div>
+
+  <!-- Modal overlay -->
+  <div id="modal-overlay" onclick="overlayClick(event)">
+    <div id="modal-box">
+      <div class="modal-handle"></div>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <!-- Main app -->
+  <div id="main-app">
+    <div id="tab-content"></div>
+    <nav id="bottom-nav">
+      <button class="nav-btn active" data-tab="home" onclick="setTab('home')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke-width="1.8" stroke-linecap="round"/><polyline points="9 22 9 12 15 12 15 22" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span>Home</span>
+      </button>
+      <button class="nav-btn" data-tab="inventory" onclick="setTab('inventory')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="3" width="20" height="14" rx="2" stroke-width="1.8"/><line x1="8" y1="21" x2="16" y2="21" stroke-width="1.8" stroke-linecap="round"/><line x1="12" y1="17" x2="12" y2="21" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span>Inventory</span>
+      </button>
+      <button class="nav-btn" data-tab="alerts" onclick="setTab('alerts')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke-width="1.8" stroke-linecap="round"/><path d="M13.73 21a2 2 0 0 1-3.46 0" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span>Alerts</span>
+        <span class="nav-badge" id="alert-badge" style="display:none"></span>
+      </button>
+      <button class="nav-btn" data-tab="utilities" onclick="setTab('utilities')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span>Utilities</span>
+        <span class="nav-badge teal" id="util-badge" style="display:none"></span>
+      </button>
+      <button class="nav-btn" data-tab="settings" onclick="setTab('settings')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3" stroke-width="1.8"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke-width="1.8"/></svg>
+        <span>Settings</span>
+      </button>
+    </nav>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+//  CONFIG — paste your Supabase credentials here
+// ════════════════════════════════════════════════════════
+const SETUP_SQL = `
+-- Run in Supabase → SQL Editor
+
+create table if not exists products (
+  id uuid primary key default gen_random_uuid(),
+  barcode text unique not null,
+  name text not null,
+  category text default 'MISC',
+  notes text default '',
+  created_at bigint default (extract(epoch from now())*1000)::bigint
+);
+create table if not exists inventory (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid references products(id) on delete cascade,
+  quantity int not null default 1,
+  expiration_date bigint not null,
+  created_at bigint default (extract(epoch from now())*1000)::bigint
+);
+create table if not exists activity_log (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid references products(id) on delete cascade,
+  action_type text not null,
+  quantity_change int not null,
+  timestamp bigint default (extract(epoch from now())*1000)::bigint
+);
+create table if not exists categories (
+  id uuid primary key default gen_random_uuid(),
+  name text unique not null
+);
+create table if not exists app_settings (
+  key text primary key,
+  value text not null
+);
+create table if not exists alert_snooze (
+  inventory_id uuid primary key,
+  snooze_until bigint not null
+);
+create table if not exists low_stock_snooze (
+  product_id uuid primary key,
+  snooze_until bigint not null
+);
+create table if not exists utilities (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  type text not null default 'SERVICEMAN',
+  contact_name text default '',
+  contact_number text default '',
+  external_link text default '',
+  notes text default '',
+  last_service_date bigint not null,
+  remind_every_number int default 1,
+  remind_every_frequency text default 'MONTHS',
+  created_at bigint default (extract(epoch from now())*1000)::bigint
+);
+
+-- Disable RLS (personal app)
+alter table products disable row level security;
+alter table inventory disable row level security;
+alter table activity_log disable row level security;
+alter table categories disable row level security;
+alter table app_settings disable row level security;
+alter table alert_snooze disable row level security;
+alter table low_stock_snooze disable row level security;
+alter table utilities disable row level security;
+`.trim();
+
+// ════════════════════════════════════════════════════════
+//  CONSTANTS
+// ════════════════════════════════════════════════════════
+const DEFAULT_CATS = ['CONDIMENTS','DRINKS','FROZEN','MISC','PROCESSED','PRODUCE','SNACKS','TOILETRIES'];
+
+// ════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════
+const S = {
+  tab: 'home',
+  inventory: [],   // {id,product_id,quantity,expiration_date,name,barcode,category}
+  logs: [],
+  categories: [],
+  snoozes: {},     // inventoryId -> snoozeUntil
+  lsSnoozes: {},   // productId -> snoozeUntil
+  utilities: [],
+  alertDays: 7,
+  lowStockQty: 2,
+
+  // flow
+  flow: null,      // null | 'ADD_FORM' | 'ADD_CONFIRM' | 'CONSUME_FORM' | 'CONSUME_ERR'
+  scanMode: null,  // 'add' | 'consume'
+  barcode: '',
+  fName: '', fCat: 'MISC', fQty: 1,
+  fExpM: new Date().getMonth()+1,
+  fExpD: new Date().getDate(),
+  fExpY: new Date().getFullYear(),
+  fIsExisting: false, fProductId: null,
+  cProductId: null, cTotalQty: 0, cQty: 1,
+
+  // UI
+  search: '', filterCat: null, filterLow: false, filterExp: false,
+  expanded: null,
+  dashModal: null,
+  modal: null,  // current modal id
+  editUtilId: null,
+};
+
+// ════════════════════════════════════════════════════════
+//  SUPABASE CLIENT
+// ════════════════════════════════════════════════════════
+let sb = null;
+
+function initSupabase(url, key) {
+  sb = supabase.createClient(url, key);
+}
+
+// ════════════════════════════════════════════════════════
+//  SETUP
+// ════════════════════════════════════════════════════════
+document.getElementById('setup-sql').textContent = SETUP_SQL;
+
+async function saveSetup() {
+  const url = document.getElementById('setup-url').value.trim();
+  const key = document.getElementById('setup-key').value.trim();
+  if (!url || !key) return alert('Please enter both URL and key.');
+  localStorage.setItem('pp_url', url);
+  localStorage.setItem('pp_key', key);
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('loading').style.display = 'flex';
+  initSupabase(url, key);
+  await loadAll();
+  startApp();
+}
+
+// ════════════════════════════════════════════════════════
+//  LOAD DATA
+// ════════════════════════════════════════════════════════
+async function loadAll() {
+  await Promise.all([
+    loadInventory(),
+    loadLogs(),
+    loadCategories(),
+    loadSnoozes(),
+    loadSettings(),
+    loadUtilities(),
+  ]);
+}
+
+async function loadInventory() {
+  const { data } = await sb.from('inventory')
+    .select('id,product_id,quantity,expiration_date,products(name,barcode,category)')
+    .order('expiration_date', { ascending: true });
+  S.inventory = (data || []).map(r => ({
+    id: r.id, product_id: r.product_id, quantity: r.quantity,
+    expiration_date: r.expiration_date,
+    name: r.products?.name || '', barcode: r.products?.barcode || '',
+    category: r.products?.category || 'MISC'
+  }));
+  render();
+}
+
+async function loadLogs() {
+  const { data } = await sb.from('activity_log')
+    .select('id,action_type,quantity_change,timestamp,products(name,category)')
+    .order('timestamp', { ascending: false }).limit(200);
+  S.logs = (data || []).map(r => ({
+    id: r.id, action: r.action_type, qty: r.quantity_change,
+    ts: r.timestamp, name: r.products?.name || '', cat: r.products?.category || ''
+  }));
+}
+
+async function loadCategories() {
+  const { data } = await sb.from('categories').select('name').order('name');
+  S.categories = (data || []).map(r => r.name);
+  render();
+}
+
+async function loadSnoozes() {
+  const [{ data: a }, { data: b }] = await Promise.all([
+    sb.from('alert_snooze').select('inventory_id,snooze_until'),
+    sb.from('low_stock_snooze').select('product_id,snooze_until'),
+  ]);
+  S.snoozes = {};
+  (a || []).forEach(r => S.snoozes[r.inventory_id] = r.snooze_until);
+  S.lsSnoozes = {};
+  (b || []).forEach(r => S.lsSnoozes[r.product_id] = r.snooze_until);
+  render();
+}
+
+async function loadSettings() {
+  const { data } = await sb.from('app_settings').select('key,value');
+  (data || []).forEach(r => {
+    if (r.key === 'alert_days') S.alertDays = parseInt(r.value) || 7;
+    if (r.key === 'low_stock_qty') S.lowStockQty = parseInt(r.value) || 2;
+  });
+}
+
+async function loadUtilities() {
+  const { data } = await sb.from('utilities').select('*').order('created_at', { ascending: false });
+  S.utilities = data || [];
+  render();
+}
+
+// ════════════════════════════════════════════════════════
+//  DB OPERATIONS
+// ════════════════════════════════════════════════════════
+async function dbGetProduct(barcode) {
+  const { data } = await sb.from('products').select('*').eq('barcode', barcode).single();
+  return data;
+}
+
+async function dbCreateProduct(barcode, name, category) {
+  const { data } = await sb.from('products').insert({ barcode, name, category }).select().single();
+  return data;
+}
+
+async function dbAddInventory(productId, qty, expDate) {
+  await sb.from('inventory').insert({ product_id: productId, quantity: qty, expiration_date: expDate });
+  await sb.from('activity_log').insert({ product_id: productId, action_type: 'ADD', quantity_change: qty, timestamp: Date.now() });
+}
+
+async function dbConsumeProduct(productId, qty) {
+  const { data: batches } = await sb.from('inventory')
+    .select('*').eq('product_id', productId).order('expiration_date', { ascending: true });
+  let rem = qty;
+  for (const b of (batches || [])) {
+    if (rem <= 0) break;
+    if (b.quantity > rem) {
+      await sb.from('inventory').update({ quantity: b.quantity - rem }).eq('id', b.id);
+      rem = 0;
+    } else {
+      rem -= b.quantity;
+      await sb.from('inventory').delete().eq('id', b.id);
+    }
+  }
+  await sb.from('activity_log').insert({ product_id: productId, action_type: 'CONSUME', quantity_change: qty, timestamp: Date.now() });
+}
+
+async function dbDeleteBatch(id) {
+  await sb.from('inventory').delete().eq('id', id);
+}
+
+async function dbSnooze(invId, days) {
+  const until = Date.now() + days * 86400000;
+  await sb.from('alert_snooze').upsert({ inventory_id: invId, snooze_until: until });
+  S.snoozes[invId] = until;
+  render();
+}
+
+async function dbSnoozeLS(productId, days) {
+  const until = Date.now() + days * 86400000;
+  await sb.from('low_stock_snooze').upsert({ product_id: productId, snooze_until: until });
+  S.lsSnoozes[productId] = until;
+  render();
+}
+
+async function dbRefillLS(productId) {
+  await sb.from('low_stock_snooze').upsert({ product_id: productId, snooze_until: Date.now() + 999*86400000 });
+  S.lsSnoozes[productId] = Date.now() + 999*86400000;
+  render();
+}
+
+async function dbDeleteConsumedAlert(invId, productId, qty) {
+  await sb.from('inventory').delete().eq('id', invId);
+  await sb.from('alert_snooze').delete().eq('inventory_id', invId);
+  await sb.from('activity_log').insert({ product_id: productId, action_type: 'CONSUME', quantity_change: qty, timestamp: Date.now() });
+}
+
+async function dbAddCategory(name) {
+  await sb.from('categories').insert({ name: name.trim().toUpperCase() });
+  await loadCategories();
+}
+
+async function dbDeleteCategory(name) {
+  await sb.from('categories').delete().eq('name', name);
+  await loadCategories();
+}
+
+async function dbSaveSetting(key, value) {
+  await sb.from('app_settings').upsert({ key, value: String(value) });
+}
+
+// Utilities
+async function dbAddUtility(util) {
+  await sb.from('utilities').insert(util);
+  await loadUtilities();
+}
+
+async function dbUpdateUtility(id, fields) {
+  await sb.from('utilities').update(fields).eq('id', id);
+  await loadUtilities();
+}
+
+async function dbDeleteUtility(id) {
+  await sb.from('utilities').delete().eq('id', id);
+  await loadUtilities();
+}
+
+// ════════════════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════════════════
+function fmt(ms) {
+  if (!ms) return '—';
+  const d = new Date(ms);
+  return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}/${d.getFullYear()}`;
+}
+
+function fmtTs(ms) {
+  const d = new Date(ms);
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+}
+
+function daysUntil(ms) {
+  return Math.ceil((ms - Date.now()) / 86400000);
+}
+
+function allCats() {
+  return [...new Set([...DEFAULT_CATS, ...S.categories])].sort();
+}
+
+function productTotals() {
+  const t = {};
+  S.inventory.forEach(i => { t[i.product_id] = (t[i.product_id] || 0) + i.quantity; });
+  return t;
+}
+
+function nextReminder(util) {
+  const d = new Date(util.last_service_date);
+  const n = util.remind_every_number;
+  if (util.remind_every_frequency === 'DAYS') d.setDate(d.getDate() + n);
+  else if (util.remind_every_frequency === 'MONTHS') d.setMonth(d.getMonth() + n);
+  else if (util.remind_every_frequency === 'YEARS') d.setFullYear(d.getFullYear() + n);
+  return d.getTime();
+}
+
+function isUtilDue(util) { return nextReminder(util) <= Date.now(); }
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ════════════════════════════════════════════════════════
+//  RENDER
+// ════════════════════════════════════════════════════════
+function render() {
+  const now = Date.now();
+  const thresh = now + S.alertDays * 86400000;
+  const totals = productTotals();
+
+  // Badge counts
+  const expCount = S.inventory.filter(i =>
+    i.expiration_date <= thresh && (S.snoozes[i.id] || 0) < now
+  ).length;
+  const lsItems = Object.entries(totals).filter(([pid, qty]) =>
+    qty <= S.lowStockQty && (S.lsSnoozes[pid] || 0) < now
+  ).length;
+  const alertTotal = expCount + lsItems;
+  const utilDue = S.utilities.filter(isUtilDue).length;
+
+  const ab = document.getElementById('alert-badge');
+  if (alertTotal > 0) { ab.style.display = 'flex'; ab.textContent = alertTotal > 99 ? '99+' : alertTotal; }
+  else ab.style.display = 'none';
+
+  const ub = document.getElementById('util-badge');
+  if (utilDue > 0) { ub.style.display = 'flex'; ub.textContent = utilDue > 99 ? '99+' : utilDue; }
+  else ub.style.display = 'none';
+
+  // Nav active
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === S.tab));
+
+  // Tab content
+  const tc = document.getElementById('tab-content');
+  switch (S.tab) {
+    case 'home':      tc.innerHTML = renderHome(totals, thresh, now); break;
+    case 'inventory': tc.innerHTML = renderInventory(totals, thresh, now); break;
+    case 'alerts':    tc.innerHTML = renderAlerts(totals, thresh, now); break;
+    case 'utilities': tc.innerHTML = renderUtilities(); break;
+    case 'settings':  tc.innerHTML = renderSettings(); break;
+  }
+
+  // Flow dialogs
+  if (S.flow) {
+    openModal(renderFlow());
+  }
+}
+
+// ── HOME ──
+function renderHome(totals, thresh, now) {
+  const total = S.inventory.reduce((a, i) => a + i.quantity, 0);
+  const lowCount = Object.values(totals).filter(q => q <= S.lowStockQty).length;
+  const expCount = S.inventory.filter(i => i.expiration_date <= thresh).length;
+  const lastLog = S.logs.find(l => l.action === 'ADD');
+  const lastName = lastLog ? lastLog.name : '—';
+
+  return `
+  <div class="screen" style="min-height:calc(100vh - 64px);display:flex;flex-direction:column">
+    <p class="home-title">My Pantry Pal</p>
+    <p class="home-sub">What would you like to do?</p>
+    <div class="home-btns" style="flex:1">
+      <button class="home-btn add" onclick="startScan('add')" style="flex:1;min-height:120px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white"><circle cx="12" cy="12" r="10" stroke-width="1.6"/><line x1="12" y1="8" x2="12" y2="16" stroke-width="2" stroke-linecap="round"/><line x1="8" y1="12" x2="16" y2="12" stroke-width="2" stroke-linecap="round"/></svg>
+        <span>Add Stock</span>
+      </button>
+      <button class="home-btn consume" onclick="startScan('consume')" style="flex:1;min-height:120px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white"><circle cx="12" cy="12" r="10" stroke-width="1.6"/><line x1="8" y1="12" x2="16" y2="12" stroke-width="2" stroke-linecap="round"/></svg>
+        <span>Consume</span>
+      </button>
+    </div>
+    <div class="dashboard">
+      <h3>Dashboard</h3>
+      <div class="dash-stats">
+        <div class="dash-stat green" onclick="openDashModal('total')">
+          <span class="val">${total}</span>
+          <span class="lbl">Total Items</span>
+        </div>
+        <div class="dash-stat red" onclick="openDashModal('low')">
+          <span class="val">${lowCount}</span>
+          <span class="lbl">Low Stock</span>
+        </div>
+        <div class="dash-stat amber" onclick="openDashModal('exp')">
+          <span class="val">${expCount}</span>
+          <span class="lbl">Expiring Soon</span>
+        </div>
+      </div>
+      <div class="dash-divider"></div>
+      <div class="dash-last">
+        <span style="color:var(--text3)">Last restocked:</span>
+        <span>${esc(lastName)}</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── INVENTORY ──
+function renderInventory(totals, thresh, now) {
+  let items = S.inventory;
+  if (S.search) items = items.filter(i => i.name.toLowerCase().includes(S.search.toLowerCase()));
+  if (S.filterCat) items = items.filter(i => i.category === S.filterCat);
+  if (S.filterLow) items = items.filter(i => (totals[i.product_id] || 0) <= S.lowStockQty);
+  if (S.filterExp) items = items.filter(i => i.expiration_date <= thresh);
+
+  // Group by category -> product
+  const grouped = {};
+  items.forEach(i => {
+    if (!grouped[i.category]) grouped[i.category] = {};
+    if (!grouped[i.category][i.product_id]) {
+      grouped[i.category][i.product_id] = { name: i.name, barcode: i.barcode, batches: [] };
+    }
+    grouped[i.category][i.product_id].batches.push(i);
+  });
+
+  const cats = Object.keys(grouped).sort();
+  const activeFilt = S.filterCat || S.filterLow || S.filterExp;
+
+  let gridHTML = '';
+  cats.forEach(cat => {
+    gridHTML += `<div class="cat-header">${esc(cat)}</div>`;
+    const products = Object.entries(grouped[cat]);
+    // 2-column grid: pair products
+    for (let pi = 0; pi < products.length; pi += 2) {
+      gridHTML += `<div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:10px">`;
+      for (let c = 0; c < 2; c++) {
+        if (pi + c >= products.length) { gridHTML += `<div></div>`; continue; }
+        const [pid, p] = products[pi + c];
+        const isExp = S.expanded === pid;
+        const ttl = p.batches.reduce((a, b) => a + b.quantity, 0);
+        gridHTML += `
+          <div class="tile${isExp ? ' expanded' : ''}" onclick="toggleExpanded('${pid}')">
+            <div class="tile-name">${esc(p.name)}</div>
+            <div class="tile-barcode">${esc(p.barcode)}</div>
+            <div class="tile-qty">Total: ${ttl}</div>
+            ${isExp ? `
+            <div class="tile-batches">
+              ${p.batches.map(b => `
+                <div class="batch-row">
+                  <div class="batch-info">
+                    <div class="b-item">${esc(b.name)}</div>
+                    <div class="b-exp">Exp: ${fmt(b.expiration_date)}</div>
+                  </div>
+                  <div class="batch-qty">${b.quantity}</div>
+                  <button class="btn-icon danger" onclick="event.stopPropagation();confirmDelete('batch','${b.id}','${esc(b.name)}')" title="Delete">
+                    <svg viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-width="2"/></svg>
+                  </button>
+                </div>`).join('')}
+            </div>` : ''}
+          </div>`;
+      }
+      gridHTML += `</div>`;
+    }
+  });
+
+  const emptyMsg = S.search || activeFilt
+    ? `<p>No items match.</p><span>Try adjusting your search or filters</span>`
+    : `<p>No items yet</p><span>Tap Add Stock on the Home tab to get started</span>`;
+
+  return `
+  <div class="screen">
+    <div class="inv-header">
+      <h2 class="screen-title" style="margin:0">Inventory</h2>
+      <button class="btn btn-ghost" onclick="openModal(renderLogsModal())">View Logs</button>
+    </div>
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8" stroke-width="2"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke-width="2" stroke-linecap="round"/></svg>
+      <input class="input" placeholder="Search products…" value="${esc(S.search)}" oninput="S.search=this.value;render()">
+    </div>
+    <div class="filter-row">
+      <button class="chip" onclick="openModal(renderFilterModal())">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" stroke-width="1.8"/></svg>
+        Filter ${activeFilt ? `<span style="background:var(--green);color:#fff;border-radius:99px;padding:1px 6px;font-size:10px">${[S.filterCat?1:0,S.filterLow?1:0,S.filterExp?1:0].reduce((a,b)=>a+b,0)}</span>` : ''}
+      </button>
+      ${S.filterCat ? `<span class="chip active">${esc(S.filterCat)}<span onclick="S.filterCat=null;render()">×</span></span>` : ''}
+      ${S.filterLow ? `<span class="chip active">Low Stock<span onclick="S.filterLow=false;render()">×</span></span>` : ''}
+      ${S.filterExp ? `<span class="chip active">Expiring<span onclick="S.filterExp=false;render()">×</span></span>` : ''}
+    </div>
+    ${cats.length === 0
+      ? `<div class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="7" width="20" height="14" rx="2" stroke-width="1.5"/><path d="M16 7V5a2 2 0 0 0-4 0v2M8 7V5a2 2 0 0 0-4 0v2" stroke-width="1.5"/></svg>
+          ${emptyMsg}
+         </div>`
+      : `<div class="inv-grid">${gridHTML}</div>`
+    }
+  </div>`;
+}
+
+// ── ALERTS ──
+function renderAlerts(totals, thresh, now) {
+  const expItems = S.inventory.filter(i => i.expiration_date <= thresh && (S.snoozes[i.id] || 0) < now);
+  const totMap = totals || productTotals();
+  const lsItems = [...new Map(
+    S.inventory
+      .filter(i => (totMap[i.product_id] || 0) <= S.lowStockQty && (S.lsSnoozes[i.product_id] || 0) < now)
+      .map(i => [i.product_id, i])
+  ).values()];
+
+  let html = `<div class="screen"><h2 class="screen-title">Alerts</h2>`;
+
+  if (expItems.length === 0 && lsItems.length === 0) {
+    html += `<div class="empty-state" style="padding-top:60px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke-width="1.5"/><polyline points="22 4 12 14.01 9 11.01" stroke-width="1.5"/></svg>
+      <p>All clear!</p><span>No expiring or low stock items</span>
+    </div>`;
+  } else {
+    if (expItems.length > 0) {
+      html += `<div class="alert-section-title">⏰ Expiring Soon</div>`;
+      expItems.forEach(i => {
+        const days = daysUntil(i.expiration_date);
+        const expired = days < 0;
+        html += `
+        <div class="alert-card ${expired ? 'expired' : 'expiring'}">
+          <div class="alert-top">
+            <div>
+              <div class="alert-name">${esc(i.name)}</div>
+              <div class="alert-cat">${esc(i.category)} · Qty ${i.quantity}</div>
+            </div>
+            <span class="alert-badge ${expired ? 'expired' : 'soon'}">${expired ? 'EXPIRED' : days === 0 ? 'Today' : `${days}d left`}</span>
+          </div>
+          <div class="alert-detail">Exp: ${fmt(i.expiration_date)}</div>
+          <div class="alert-actions">
+            <button class="btn btn-outline" onclick="dbSnooze('${i.id}',3)">Remind in 3d</button>
+            <button class="btn btn-primary" onclick="confirmConsumedThrown('${i.id}','${i.product_id}',${i.quantity})">Consumed/Thrown</button>
+          </div>
+        </div>`;
+      });
+    }
+
+    if (lsItems.length > 0) {
+      html += `<div class="alert-section-title" style="margin-top:${expItems.length?'20px':'0'}">📦 Low Stock</div>`;
+      lsItems.forEach(i => {
+        const total = totMap[i.product_id] || 0;
+        html += `
+        <div class="alert-card lowstock">
+          <div class="alert-top">
+            <div>
+              <div class="alert-name">${esc(i.name)}</div>
+              <div class="alert-cat">${esc(i.category)}</div>
+            </div>
+            <span class="alert-badge low">Only ${total} left</span>
+          </div>
+          <div class="alert-actions">
+            <button class="btn btn-outline" onclick="dbSnoozeLS('${i.product_id}',3)">Remind in 3d</button>
+            <button class="btn btn-primary" onclick="dbRefillLS('${i.product_id}')">Refilled ✓</button>
+          </div>
+        </div>`;
+      });
+    }
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+// ── UTILITIES ──
+function renderUtilities() {
+  let html = `<div class="screen">
+    <div class="util-header">
+      <div>
+        <h2 style="font-size:22px;font-weight:800;color:var(--teal)">Utilities</h2>
+        <p style="font-size:12px;color:var(--teal);opacity:.7;margin-top:2px">Service &amp; vendor records</p>
+      </div>
+      <button class="util-add-btn" onclick="openModal(renderAddUtilModal())">
+        <svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="white" stroke-width="2.2" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="white" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+    </div>`;
+
+  if (S.utilities.length === 0) {
+    html += `<div class="empty-state" style="padding-top:60px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="stroke:var(--teal);opacity:.3"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" stroke-width="1.5"/></svg>
+      <p style="color:var(--teal)">No records yet</p><span>Tap + to add your first utility record</span>
+    </div>`;
+  } else {
+    S.utilities.forEach(u => {
+      const due = isUtilDue(u);
+      const next = nextReminder(u);
+      const typeLabel = u.type === 'VENDOR' ? 'Last Purchased' : 'Last Serviced';
+      const isEditing = S.editUtilId === u.id;
+      html += `
+      <div class="util-card${due ? ' due' : ''}">
+        <div class="util-top">
+          <div>
+            <div class="util-name-wrap">
+              <span class="util-name">${esc(u.name)}</span>
+              ${due ? `<span class="due-tag">DUE</span>` : ''}
+            </div>
+            <div class="util-type">${esc(u.type)}</div>
+          </div>
+          <div class="util-actions">
+            <button class="btn-icon teal" onclick="shareUtility('${u.id}')" title="Share">
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="18" cy="5" r="3" stroke-width="1.8"/><circle cx="6" cy="12" r="3" stroke-width="1.8"/><circle cx="18" cy="19" r="3" stroke-width="1.8"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" stroke-width="1.8"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" stroke-width="1.8"/></svg>
+            </button>
+            <button class="btn-icon${isEditing?' teal':''}" onclick="toggleEditUtil('${u.id}')" title="Edit">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke-width="1.8" stroke-linecap="round"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </button>
+            <button class="btn-icon danger" onclick="confirmDelete('utility','${u.id}','${esc(u.name)}')" title="Delete">
+              <svg viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-width="2"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="util-row"><span class="lbl">${esc(typeLabel)}</span><span class="val">${fmt(u.last_service_date)}</span></div>
+        <div class="util-row"><span class="lbl">Next Reminder</span><span class="val" style="color:${due?'var(--red)':'var(--teal)'}">${fmt(next)}</span></div>
+        ${u.contact_name ? `<div class="util-row"><span class="lbl">Contact</span><span class="val">${esc(u.contact_name)}</span></div>` : ''}
+        ${u.contact_number ? `<div class="util-row"><span class="lbl">Number</span><span class="val copy" onclick="copyText('${esc(u.contact_number)}','Number')">${esc(u.contact_number)} 📋</span></div>` : ''}
+        ${u.external_link ? `<div class="util-row"><span class="lbl">Link</span><span class="val link" onclick="openLink('${esc(u.external_link)}')">${esc(u.external_link)}</span></div>` : ''}
+        ${u.notes ? `<div class="util-row" style="flex-direction:column;align-items:flex-start;gap:2px"><span class="lbl">Notes</span><span class="val">${esc(u.notes)}</span></div>` : ''}
+        <div class="util-freq">Reminds every ${u.remind_every_number} ${u.remind_every_frequency.toLowerCase()}</div>
+        ${isEditing ? `
+        <div class="util-edit-form">
+          <div class="field"><label>Contact Name</label><input class="input" id="eu-cname" value="${esc(u.contact_name)}"></div>
+          <div class="field"><label>Contact Number</label><input class="input" id="eu-cnum" value="${esc(u.contact_number)}"></div>
+          <div class="field"><label>External Link</label><input class="input" id="eu-link" value="${esc(u.external_link)}"></div>
+          <div class="field"><label>Notes</label><textarea class="input" id="eu-notes">${esc(u.notes)}</textarea></div>
+          <div class="btn-row">
+            <button class="btn btn-outline" onclick="toggleEditUtil(null)">Cancel</button>
+            <button class="btn btn-teal" onclick="saveUtilEdit('${u.id}')">Save</button>
+          </div>
+        </div>` : ''}
+      </div>`;
+    });
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+// ── SETTINGS ──
+function renderSettings() {
+  const cats = allCats();
+  return `
+  <div class="screen">
+    <h2 class="screen-title">Settings</h2>
+
+    <div class="settings-section">
+      <h3>Expiration Alert Threshold</h3>
+      <p>Show alerts for items expiring within this many days</p>
+      <div class="field">
+        <select class="input" onchange="saveSetting('alert_days',this.value);S.alertDays=+this.value;render()">
+          ${[1,3,5,7,10,14,21,30].map(d => `<option value="${d}" ${S.alertDays==d?'selected':''}>${d} days</option>`).join('')}
+        </select>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>Low Stock Threshold</h3>
+      <p>Items at or below this quantity are flagged as low stock</p>
+      <div class="field">
+        <select class="input" onchange="saveSetting('low_stock_qty',this.value);S.lowStockQty=+this.value;render()">
+          ${[1,2,3,4,5,10].map(q => `<option value="${q}" ${S.lowStockQty==q?'selected':''}>${q} items</option>`).join('')}
+        </select>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>Manage Categories</h3>
+      <p>Add custom categories for your products</p>
+      <div class="cat-list">
+        ${cats.map(c => `
+          <div class="cat-item">
+            <span>${esc(c)}</span>
+            ${DEFAULT_CATS.includes(c)
+              ? `<span class="def-tag">default</span>`
+              : `<button class="btn-icon danger" onclick="confirmDelete('cat','${esc(c)}','${esc(c)}')">
+                   <svg viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-width="2"/></svg>
+                 </button>`}
+          </div>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px">
+        <input class="input" id="new-cat-input" placeholder="NEW CATEGORY" style="flex:1;text-transform:uppercase">
+        <button class="btn btn-primary" onclick="addCatFromSettings()">Add</button>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>Backup &amp; Restore</h3>
+      <p>Export your inventory to a CSV file or import from a previous export</p>
+      <button class="btn btn-primary btn-full" onclick="exportCSV()">Export to CSV</button>
+      <div style="margin-top:10px">
+        <label class="btn btn-outline btn-full" style="cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px;height:16px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-width="2" stroke-linecap="round"/><polyline points="17 8 12 3 7 8" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="3" x2="12" y2="15" stroke-width="2" stroke-linecap="round"/></svg>
+          Import from CSV
+          <input type="file" accept=".csv" style="display:none" onchange="importCSV(this)">
+        </label>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ════════════════════════════════════════════════════════
+//  MODAL RENDERS
+// ════════════════════════════════════════════════════════
+function openModal(html) {
+  document.getElementById('modal-content').innerHTML = html;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  S.flow = null;
+}
+
+function overlayClick(e) {
+  // Don't close on backdrop click — user must use close/cancel buttons
+}
+
+function renderFlow() {
+  switch (S.flow) {
+    case 'ADD_FORM':     return renderAddForm();
+    case 'ADD_CONFIRM':  return renderAddConfirm();
+    case 'CONSUME_FORM': return renderConsumeForm();
+    case 'CONSUME_ERR':  return renderConsumeErr();
+    default: return '';
+  }
+}
+
+// ── ADD FORM ──
+function renderAddForm() {
+  const cats = allCats();
+  return `
+  <div class="modal-title-row">
+    <span class="modal-title">${S.fIsExisting ? 'Add Stock' : 'New Product'}</span>
+    <button class="modal-close" onclick="closeModal()">
+      <svg viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-width="2"/></svg>
+    </button>
+  </div>
+  <div class="field">
+    <label>Product Name</label>
+    <input class="input" id="f-name" value="${esc(S.fName)}" ${S.fIsExisting ? 'readonly' : ''} placeholder="Enter product name">
+  </div>
+  <div class="field">
+    <label>Category</label>
+    <select class="input" id="f-cat" ${S.fIsExisting ? 'disabled' : ''}>
+      ${cats.map(c => `<option value="${esc(c)}" ${S.fCat===c?'selected':''}>${esc(c)}</option>`).join('')}
+      ${!DEFAULT_CATS.includes('') ? `<option value="__new__">+ Add new category…</option>` : ''}
+    </select>
+  </div>
+  <div class="field">
+    <label>Expiration Date</label>
+    <input type="date" class="input" id="f-exp" value="${S.fExpY}-${String(S.fExpM).padStart(2,'0')}-${String(S.fExpD).padStart(2,'0')}">
+  </div>
+  <div class="field">
+    <label>Quantity</label>
+    <div class="qty-stepper">
+      <button class="qty-btn minus" onclick="adjQty(-1)">
+        <svg viewBox="0 0 24 24" fill="none"><line x1="5" y1="12" x2="19" y2="12" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>
+      </button>
+      <span class="qty-display" id="f-qty-display">${S.fQty}</span>
+      <button class="qty-btn plus" onclick="adjQty(1)">
+        <svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="white" stroke-width="2.5" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-primary" onclick="submitAddForm()">Review →</button>
+  </div>`;
+}
+
+function adjQty(delta) {
+  S.fQty = Math.max(1, S.fQty + delta);
+  const el = document.getElementById('f-qty-display');
+  if (el) el.textContent = S.fQty;
+}
+
+function submitAddForm() {
+  const name = document.getElementById('f-name')?.value?.trim();
+  const cat = document.getElementById('f-cat')?.value;
+  const expInput = document.getElementById('f-exp')?.value;
+
+  if (cat === '__new__') { promptNewCategory(); return; }
+  if (!name) { alert('Please enter a product name.'); return; }
+  if (!expInput) { alert('Please select an expiration date.'); return; }
+
+  const parts = expInput.split('-');
+  S.fName = name;
+  S.fCat = cat || 'MISC';
+  S.fExpY = +parts[0]; S.fExpM = +parts[1]; S.fExpD = +parts[2];
+  S.flow = 'ADD_CONFIRM';
+  openModal(renderFlow());
+}
+
+function promptNewCategory() {
+  const name = prompt('Enter new category name:');
+  if (!name?.trim()) return;
+  dbAddCategory(name).then(() => {
+    S.fCat = name.trim().toUpperCase();
+    S.flow = 'ADD_FORM';
+    openModal(renderFlow());
+  });
+}
+
+// ── ADD CONFIRM ──
+function renderAddConfirm() {
+  const expMs = new Date(S.fExpY, S.fExpM-1, S.fExpD).getTime();
+  return `
+  <div class="modal-title-row">
+    <span class="modal-title">Confirm Add</span>
+    <button class="modal-close" onclick="S.flow='ADD_FORM';openModal(renderFlow())">
+      <svg viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-width="2"/></svg>
+    </button>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+    <div class="popup-row"><div class="pname">Product</div><div style="font-weight:600">${esc(S.fName)}</div></div>
+    <div class="popup-row"><div class="pname">Category</div><div style="font-weight:600">${esc(S.fCat)}</div></div>
+    <div class="popup-row"><div class="pname">Expiration</div><div style="font-weight:600">${fmt(expMs)}</div></div>
+    <div class="popup-row"><div class="pname">Quantity</div><div style="font-weight:600;color:var(--green);font-size:20px">${S.fQty}</div></div>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-outline" onclick="S.flow='ADD_FORM';openModal(renderFlow())">← Back</button>
+    <button class="btn btn-primary" onclick="confirmAdd()">Confirm ✓</button>
+  </div>`;
+}
+
+async function confirmAdd() {
+  const expMs = new Date(S.fExpY, S.fExpM-1, S.fExpD).getTime();
+  closeModal();
+  let product = await dbGetProduct(S.barcode);
+  if (!product) product = await dbCreateProduct(S.barcode, S.fName, S.fCat);
+  await dbAddInventory(product.id, S.fQty, expMs);
+  await loadInventory();
+  await loadLogs();
+  showSuccess();
+}
+
+// ── CONSUME FORM ──
+function renderConsumeForm() {
+  return `
+  <div class="modal-title-row">
+    <span class="modal-title">Consume Product</span>
+    <button class="modal-close" onclick="closeModal()">
+      <svg viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-width="2"/></svg>
+    </button>
+  </div>
+  <p class="product-name-big">${esc(S.fName)}</p>
+  <p class="product-barcode-small">${esc(S.barcode)}</p>
+  <div class="stock-info-row">
+    <span style="color:var(--text3)">Total in stock</span>
+    <span style="font-weight:700;color:var(--green)">${S.cTotalQty}</span>
+  </div>
+  <div class="field" style="text-align:center">
+    <label style="display:block;margin-bottom:8px">How many are you consuming?</label>
+    <div class="qty-stepper">
+      <button class="qty-btn minus" onclick="adjCQty(-1)">
+        <svg viewBox="0 0 24 24" fill="none"><line x1="5" y1="12" x2="19" y2="12" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>
+      </button>
+      <span class="qty-display" id="c-qty-display">${S.cQty}</span>
+      <button class="qty-btn plus" onclick="adjCQty(1)">
+        <svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="5" x2="12" y2="19" stroke="white" stroke-width="2.5" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-primary" onclick="confirmConsume()">Yes, Consume ✓</button>
+  </div>`;
+}
+
+function adjCQty(delta) {
+  S.cQty = Math.max(1, Math.min(S.cTotalQty, S.cQty + delta));
+  const el = document.getElementById('c-qty-display');
+  if (el) el.textContent = S.cQty;
+}
+
+async function confirmConsume() {
+  closeModal();
+  await dbConsumeProduct(S.cProductId, S.cQty);
+  await loadInventory();
+  await loadLogs();
+  showSuccess();
+}
+
+// ── CONSUME ERROR ──
+function renderConsumeErr() {
+  return `
+  <div style="text-align:center;padding:20px 0">
+    <div style="width:60px;height:60px;background:var(--red-l);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--red)" style="width:28px;height:28px"><circle cx="12" cy="12" r="10" stroke-width="1.8"/><line x1="15" y1="9" x2="9" y2="15" stroke-width="2" stroke-linecap="round"/><line x1="9" y1="9" x2="15" y2="15" stroke-width="2" stroke-linecap="round"/></svg>
+    </div>
+    <p style="font-size:18px;font-weight:700;margin-bottom:8px">Product Not Found</p>
+    <p style="color:var(--text3);font-size:14px;margin-bottom:24px">No product matched barcode "<strong>${esc(S.barcode)}</strong>" in your inventory.</p>
+    <button class="btn btn-primary btn-full" onclick="closeModal()">OK</button>
+  </div>`;
+}
+
+// ── FILTER MODAL ──
+function renderFilterModal() {
+  const cats = [...new Set(S.inventory.map(i => i.category))].sort();
+  return `
+  <div class="modal-title-row">
+    <span class="modal-title">Filter</span>
+    <button class="modal-close" onclick="closeModal()">
+      <svg viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-width="2"/></svg>
+    </button>
+  </div>
+  <p style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Category</p>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">
+    <button class="chip${!S.filterCat?' active':''}" onclick="S.filterCat=null;render();closeModal()">All</button>
+    ${cats.map(c => `<button class="chip${S.filterCat===c?' active':''}" onclick="S.filterCat='${esc(c)}';render();closeModal()">${esc(c)}</button>`).join('')}
+  </div>
+  <div class="settings-row">
+    <div><div class="settings-row label" style="font-size:14px;font-weight:600">Low Stock Only</div><div class="sub">Qty ≤ ${S.lowStockQty}</div></div>
+    <label style="position:relative;display:inline-block;width:44px;height:24px">
+      <input type="checkbox" ${S.filterLow?'checked':''} onchange="S.filterLow=this.checked;render()" style="opacity:0;width:0;height:0">
+      <span style="position:absolute;inset:0;background:${S.filterLow?'var(--green)':'var(--border)'};border-radius:99px;cursor:pointer;transition:.2s"></span>
+      <span style="position:absolute;top:2px;left:${S.filterLow?'22':'2'}px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>
+    </label>
+  </div>
+  <div class="settings-row">
+    <div><div style="font-size:14px;font-weight:600">Expiring Soon Only</div><div class="sub">Within ${S.alertDays} days</div></div>
+    <label style="position:relative;display:inline-block;width:44px;height:24px">
+      <input type="checkbox" ${S.filterExp?'checked':''} onchange="S.filterExp=this.checked;render()" style="opacity:0;width:0;height:0">
+      <span style="position:absolute;inset:0;background:${S.filterExp?'var(--green)':'var(--border)'};border-radius:99px;cursor:pointer;transition:.2s"></span>
+      <span style="position:absolute;top:2px;left:${S.filterExp?'22':'2'}px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>
+    </label>
+  </div>
+  <div class="btn-row" style="margin-top:20px">
+    <button class="btn btn-outline" onclick="S.filterCat=null;S.filterLow=false;S.filterExp=false;render();closeModal()">Clear All</button>
+    <button class="btn btn-primary" onclick="closeModal()">Apply</button>
+  </div>`;
+}
+
+// ── LOGS MODAL ──
+function renderLogsModal() {
+  const html = S.logs.length === 0
+    ? `<p style="color:var(--text3);text-align:center;padding:24px">No activity yet.</p>`
+    : S.logs.map(l => `
+      <div class="log-row">
+        <div>
+          <div class="log-name">${esc(l.name)}</div>
+          <div class="log-meta">${esc(l.cat)} · ${fmtTs(l.ts)}</div>
+        </div>
+        <div class="log-action">
+          <div class="act ${l.action.toLowerCase()}">${l.action === 'ADD' ? '+ Added' : '− Consumed'}</div>
+          <div class="qty">Qty: ${l.qty}</div>
+        </div>
+      </div>`).join('');
+
+  return `
+  <div class="modal-title-row">
+    <span class="modal-title">Activity Logs</span>
+    <button class="modal-close" onclick="closeModal()">
+      <svg viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-width="2"/></svg>
+    </button>
+  </div>
+  <div style="max-height:420px;overflow-y:auto">${html}</div>
+  <button class="green-close-btn" onclick="closeModal()">
+    <svg viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-width="2.2"/><line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-width="2.2"/></svg>
+    Close
+  </button>`;
+}
+
+// ── DASH MODAL ──
+function openDashModal(type) {
+  const now = Date.now();
+  const thresh = now + S.alertDays * 86400000;
+  const totals = productTotals();
+
+  let title, items;
+  if (type === 'total') {
+    title = 'All Items';
+    const grouped = {};
+    S.inventory.forEach(i => {
+      if (!grouped[i.product_id]) grouped[i.product_id] = { name: i.name, cat: i.category, qty: 0 };
+      grouped[i.product_id].qty += i.quantity;
+    });
+    items = Object.values(grouped).map(p => ({
+      name: p.name, sub: p.cat, val: `Qty: ${p.qty}`, color: 'var(--green)', snoozed: false
+    }));
+  } else if (type === 'low') {
+    title = 'Low Stock Items';
+    const seen = new Set();
+    items = S.inventory
+      .filter(i => (totals[i.product_id]||0) <= S.lowStockQty && !seen.has(i.product_id) && !seen.add(i.product_id))
+      .map(i => ({
+        name: i.name, sub: i.category, val: `Qty: ${totals[i.product_id]||0}`,
+        color: 'var(--red)', snoozed: (S.lsSnoozes[i.product_id]||0) > now
+      }));
+  } else {
+    title = 'Expiring Soon';
+    items = S.inventory.filter(i => i.expiration_date <= thresh).map(i => ({
+      name: i.name, sub: i.category, val: fmt(i.expiration_date),
+      color: 'var(--amber)', snoozed: (S.snoozes[i.id]||0) > now
+    }));
+  }
+
+  const rows = items.length === 0
+    ? `<p style="color:var(--text3);text-align:center;padding:24px 0">Nothing to show</p>`
+    : items.map(it => `
+      <div class="popup-row">
+        <div>
+          <div class="pname">${esc(it.name)} ${it.snoozed?`<span class="snoozed-tag">snoozed</span>`:''}</div>
+          <div class="pcat">${esc(it.sub)}</div>
+        </div>
+        <div class="pval" style="color:${it.color}">${esc(it.val)}</div>
+      </div>`).join('');
+
+  openModal(`
+    <div class="modal-title-row">
+      <span class="modal-title">${esc(title)}</span>
+      <button class="modal-close" onclick="closeModal()">
+        <svg viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-width="2"/></svg>
+      </button>
+    </div>
+    <div class="popup-list">${rows}</div>
+    <button class="green-close-btn" onclick="closeModal()">
+      <svg viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-width="2.2"/><line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-width="2.2"/></svg>
+      Close
+    </button>`);
+}
+
+// ── ADD UTILITY MODAL ──
+function renderAddUtilModal() {
+  const today = new Date();
+  const yy = today.getFullYear();
+  const mm = String(today.getMonth()+1).padStart(2,'0');
+  const dd = String(today.getDate()).padStart(2,'0');
+  return `
+  <div class="modal-title-row">
+    <span class="modal-title" style="color:var(--teal)">Add Utility Record</span>
+    <button class="modal-close" onclick="closeModal()">
+      <svg viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-width="2"/></svg>
+    </button>
+  </div>
+  <div class="field"><label>Record Name</label>
+    <input class="input" id="u-name" placeholder="e.g. AC Cleaning, Gas Purchase"></div>
+  <div class="field"><label>Type</label>
+    <div class="type-toggle">
+      <button class="type-btn active" id="tt-svc" onclick="setTypeToggle('SERVICEMAN')">Serviceman</button>
+      <button class="type-btn" id="tt-vnd" onclick="setTypeToggle('VENDOR')">Vendor</button>
+    </div>
+    <input type="hidden" id="u-type" value="SERVICEMAN">
+  </div>
+  <div class="field"><label>Contact Name</label><input class="input" id="u-cname" placeholder="—"></div>
+  <div class="field"><label>Contact Number <span style="color:var(--text3)">(optional)</span></label><input class="input" id="u-cnum" type="tel" placeholder="—"></div>
+  <div class="field"><label>External Link <span style="color:var(--text3)">(optional)</span></label><input class="input" id="u-link" placeholder="—"></div>
+  <div class="field"><label>Notes <span style="color:var(--text3)">(optional)</span></label><textarea class="input" id="u-notes" placeholder="—"></textarea></div>
+  <div class="field"><label id="u-date-label">Last Serviced Date</label>
+    <input type="date" class="input" id="u-date" value="${yy}-${mm}-${dd}"></div>
+  <div class="field"><label>Remind Every</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <select class="input" id="u-rnum">
+        ${Array.from({length:30},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('')}
+      </select>
+      <select class="input" id="u-rfreq">
+        <option value="DAYS">Days</option>
+        <option value="MONTHS" selected>Months</option>
+        <option value="YEARS">Years</option>
+      </select>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-teal" onclick="submitAddUtil()">Save Record</button>
+  </div>`;
+}
+
+function setTypeToggle(type) {
+  document.getElementById('u-type').value = type;
+  document.getElementById('tt-svc').classList.toggle('active', type === 'SERVICEMAN');
+  document.getElementById('tt-vnd').classList.toggle('active', type === 'VENDOR');
+  const lbl = document.getElementById('u-date-label');
+  if (lbl) lbl.textContent = type === 'VENDOR' ? 'Last Purchased Date' : 'Last Serviced Date';
+}
+
+async function submitAddUtil() {
+  const name = document.getElementById('u-name')?.value?.trim();
+  if (!name) { alert('Please enter a record name.'); return; }
+  const dateVal = document.getElementById('u-date')?.value;
+  if (!dateVal) { alert('Please select a date.'); return; }
+  const parts = dateVal.split('-');
+  const ms = new Date(+parts[0], +parts[1]-1, +parts[2]).getTime();
+  await dbAddUtility({
+    name,
+    type: document.getElementById('u-type')?.value || 'SERVICEMAN',
+    contact_name: document.getElementById('u-cname')?.value?.trim() || '',
+    contact_number: document.getElementById('u-cnum')?.value?.trim() || '',
+    external_link: document.getElementById('u-link')?.value?.trim() || '',
+    notes: document.getElementById('u-notes')?.value?.trim() || '',
+    last_service_date: ms,
+    remind_every_number: parseInt(document.getElementById('u-rnum')?.value) || 1,
+    remind_every_frequency: document.getElementById('u-rfreq')?.value || 'MONTHS',
+  });
+  closeModal();
+}
+
+// ── CONFIRM DELETE ──
+function confirmDelete(type, id, name) {
+  openModal(`
+  <div class="confirm-icon">
+    <svg viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke-width="2" stroke-linecap="round"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke-width="2" stroke-linecap="round"/></svg>
+  </div>
+  <p class="confirm-q">Remove this record?</p>
+  <p class="confirm-sub">${esc(name)}</p>
+  <div class="btn-row">
+    <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-danger" onclick="doDelete('${esc(type)}','${esc(id)}')">Yes, Delete</button>
+  </div>`);
+}
+
+async function doDelete(type, id) {
+  closeModal();
+  if (type === 'batch') { await dbDeleteBatch(id); await loadInventory(); render(); }
+  else if (type === 'utility') { await dbDeleteUtility(id); }
+  else if (type === 'cat') { await dbDeleteCategory(id); }
+}
+
+// ── CONFIRM CONSUMED/THROWN ──
+function confirmConsumedThrown(invId, productId, qty) {
+  openModal(`
+  <div class="confirm-icon" style="background:var(--green-l)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" style="width:26px;height:26px"><polyline points="20 6 9 17 4 12" stroke-width="2.2" stroke-linecap="round"/></svg>
+  </div>
+  <p class="confirm-q">Mark as consumed or thrown?</p>
+  <p class="confirm-sub">This will remove the batch from your inventory.</p>
+  <div class="btn-row">
+    <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-primary" onclick="doConsumedThrown('${esc(invId)}','${esc(productId)}',${qty})">Yes</button>
+  </div>`);
+}
+
+async function doConsumedThrown(invId, productId, qty) {
+  closeModal();
+  await dbDeleteConsumedAlert(invId, productId, qty);
+  await loadInventory();
+  await loadLogs();
+  render();
+}
+
+// ════════════════════════════════════════════════════════
+//  SCAN / CAMERA — works on iOS Safari + Android Chrome
+// ════════════════════════════════════════════════════════
+let html5Scanner = null;
+let torchOn = false;
+let scanVideoTrack = null;
+let scannerStarted = false;
+
+async function startScan(mode) {
+  S.scanMode = mode;
+  S.fQty = 1; S.cQty = 1;
+  S.fExpM = new Date().getMonth()+1;
+  S.fExpD = new Date().getDate();
+  S.fExpY = new Date().getFullYear();
+
+  // Check camera permission available
+  if (!navigator.mediaDevices?.getUserMedia) {
+    showManualScan();
+    return;
+  }
+
+  document.getElementById('scan-overlay').classList.add('open');
+  torchOn = false;
+  document.getElementById('torch-btn').classList.remove('on');
+
+  try {
+    html5Scanner = new Html5Qrcode('scan-reader', { verbose: false });
+    await html5Scanner.start(
+      { facingMode: 'environment' },
+      { fps: 12, qrbox: { width: 220, height: 220 },
+        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+        aspectRatio: window.innerHeight / window.innerWidth
+      },
+      (barcode) => { onBarcodeFound(barcode); }
+    );
+    scannerStarted = true;
+
+    // Grab video track for torch control (Android only)
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    scanVideoTrack = stream.getVideoTracks()[0];
+    stream.getTracks().forEach(t => t.stop()); // stop the extra stream; html5Scanner has its own
+
+  } catch(e) {
+    closeScan();
+    showManualScan();
+  }
+}
+
+async function closeScan() {
+  torchOn = false;
+  scanVideoTrack = null;
+  if (html5Scanner && scannerStarted) {
+    try { await html5Scanner.stop(); } catch(e) {}
+    try { html5Scanner.clear(); } catch(e) {}
+    html5Scanner = null;
+    scannerStarted = false;
+  }
+  document.getElementById('scan-overlay').classList.remove('open');
+}
+
+function toggleTorch() {
+  // Torch only works on Android Chrome — silently ignored on iOS
+  if (!html5Scanner || !scannerStarted) return;
+  torchOn = !torchOn;
+  html5Scanner.applyVideoConstraints({ advanced: [{ torch: torchOn }] }).catch(() => {
+    torchOn = false;
+  });
+  document.getElementById('torch-btn').classList.toggle('on', torchOn);
+}
+
+function showManualScan() {
+  closeScan();
+  openModal(`
+  <div class="modal-title-row">
+    <span class="modal-title">Enter Barcode</span>
+    <button class="modal-close" onclick="closeModal()">
+      <svg viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-width="2"/></svg>
+    </button>
+  </div>
+  <p style="font-size:13px;color:var(--text3);margin-bottom:14px">Camera not available on this browser. Enter the barcode number manually.</p>
+  <div class="field">
+    <label>Barcode Number</label>
+    <input class="input" id="manual-barcode" inputmode="numeric" placeholder="e.g. 4901085183007" autofocus>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-primary" onclick="submitManualBarcode()">Next →</button>
+  </div>`);
+}
+
+async function submitManualBarcode() {
+  const val = document.getElementById('manual-barcode')?.value?.trim();
+  if (!val) { alert('Please enter a barcode.'); return; }
+  onBarcodeFound(val);
+}
+
+async function onBarcodeFound(barcode) {
+  closeScan();
+  closeModal();
+  S.barcode = barcode;
+
+  if (S.scanMode === 'add') {
+    const product = await dbGetProduct(barcode);
+    if (product) {
+      S.fName = product.name; S.fCat = product.category || 'MISC';
+      S.fProductId = product.id; S.fIsExisting = true;
+    } else {
+      S.fName = ''; S.fCat = 'MISC'; S.fProductId = null; S.fIsExisting = false;
+    }
+    S.flow = 'ADD_FORM';
+    openModal(renderFlow());
+  } else {
+    // consume
+    const totals = productTotals();
+    const item = S.inventory.find(i => i.barcode === barcode);
+    if (!item) {
+      S.flow = 'CONSUME_ERR';
+      openModal(renderFlow());
+      return;
+    }
+    S.fName = item.name;
+    S.cProductId = item.product_id;
+    S.cTotalQty = totals[item.product_id] || 0;
+    S.cQty = 1;
+    S.flow = 'CONSUME_FORM';
+    openModal(renderFlow());
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  SUCCESS OVERLAY
+// ════════════════════════════════════════════════════════
+let successTimer = null;
+
+function showSuccess() {
+  const el = document.getElementById('success-overlay');
+  el.classList.add('open');
+  if (successTimer) clearTimeout(successTimer);
+  successTimer = setTimeout(dismissSuccess, 3000);
+}
+
+function dismissSuccess() {
+  if (successTimer) clearTimeout(successTimer);
+  document.getElementById('success-overlay').classList.remove('open');
+}
+
+// ════════════════════════════════════════════════════════
+//  UTILITIES ACTIONS
+// ════════════════════════════════════════════════════════
+function toggleEditUtil(id) {
+  S.editUtilId = S.editUtilId === id ? null : id;
+  render();
+}
+
+async function saveUtilEdit(id) {
+  const fields = {
+    contact_name: document.getElementById('eu-cname')?.value?.trim() || '',
+    contact_number: document.getElementById('eu-cnum')?.value?.trim() || '',
+    external_link: document.getElementById('eu-link')?.value?.trim() || '',
+    notes: document.getElementById('eu-notes')?.value?.trim() || '',
+  };
+  await dbUpdateUtility(id, fields);
+  S.editUtilId = null;
+}
+
+function shareUtility(id) {
+  const u = S.utilities.find(x => x.id === id);
+  if (!u) return;
+  const text = [
+    `📋 ${u.name}`, `Type: ${u.type}`,
+    u.contact_name && `Contact: ${u.contact_name}`,
+    u.contact_number && `Number: ${u.contact_number}`,
+    u.external_link && `Link: ${u.external_link}`,
+    u.notes && `Notes: ${u.notes}`,
+    `Last ${u.type === 'VENDOR' ? 'Purchased' : 'Serviced'}: ${fmt(u.last_service_date)}`,
+    `Next Reminder: ${fmt(nextReminder(u))}`,
+  ].filter(Boolean).join('\n');
+  if (navigator.share) navigator.share({ text });
+  else { navigator.clipboard?.writeText(text); alert('Copied to clipboard!'); }
+}
+
+function copyText(text, label) {
+  navigator.clipboard?.writeText(text).then(() => alert(`${label} copied!`));
+}
+
+function openLink(url) {
+  window.open(url.startsWith('http') ? url : `https://${url}`, '_blank');
+}
+
+// ════════════════════════════════════════════════════════
+//  SETTINGS ACTIONS
+// ════════════════════════════════════════════════════════
+async function saveSetting(key, value) {
+  await dbSaveSetting(key, value);
+}
+
+async function addCatFromSettings() {
+  const inp = document.getElementById('new-cat-input');
+  const name = inp?.value?.trim().toUpperCase();
+  if (!name) return;
+  await dbAddCategory(name);
+  inp.value = '';
+}
+
+function exportCSV() {
+  const rows = [['Name','Category','Quantity','ExpirationDate']];
+  S.inventory.forEach(i => rows.push([i.name, i.category, i.quantity, fmt(i.expiration_date)]));
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `pantry_backup_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+async function importCSV(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const text = await file.text();
+  const lines = text.trim().split('\n').slice(1);
+  let count = 0;
+  for (const line of lines) {
+    const parts = line.split(',').map(p => p.replace(/^"|"$/g,'').trim());
+    if (parts.length < 4) continue;
+    const [name, category, qty, expStr] = parts;
+    const barcode = name.toLowerCase().replace(/\s+/g,'_');
+    let product = await dbGetProduct(barcode);
+    if (!product) product = await dbCreateProduct(barcode, name, category);
+    const expParts = expStr.split('/');
+    const expMs = expParts.length === 3
+      ? new Date(+expParts[2], +expParts[0]-1, +expParts[1]).getTime()
+      : Date.now();
+    await dbAddInventory(product.id, parseInt(qty)||1, expMs);
+    count++;
+  }
+  await loadInventory();
+  await loadLogs();
+  alert(`Imported ${count} records successfully.`);
+}
+
+// ════════════════════════════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════════════════════════════
+function setTab(tab) {
+  S.tab = tab;
+  S.expanded = null;
+  S.flow = null;
+  closeModal();
+  render();
+}
+
+function toggleExpanded(productId) {
+  S.expanded = S.expanded === productId ? null : productId;
+  render();
+}
+
+// ════════════════════════════════════════════════════════
+//  REAL-TIME SUBSCRIPTIONS
+// ════════════════════════════════════════════════════════
+function setupRealtime() {
+  sb.channel('pantry-sync')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory' }, loadInventory)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, loadInventory)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log' }, loadLogs)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, loadCategories)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'alert_snooze' }, loadSnoozes)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'low_stock_snooze' }, loadSnoozes)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'utilities' }, loadUtilities)
+    .subscribe();
+}
+
+// ════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════
+function startApp() {
+  document.getElementById('loading').style.display = 'none';
+  const app = document.getElementById('main-app');
+  app.style.display = 'flex';
+  setupRealtime();
+  render();
+}
+
+async function init() {
+  const url = localStorage.getItem('pp_url');
+  const key = localStorage.getItem('pp_key');
+
+  if (!url || !key || url === 'YOUR_SUPABASE_URL') {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('setup').style.display = 'block';
+    return;
+  }
+
+  initSupabase(url, key);
+  try {
+    await loadAll();
+    startApp();
+  } catch(e) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('setup').style.display = 'block';
+  }
+}
+
+init();
+</script>
+</body>
+</html>
