@@ -227,15 +227,14 @@ textarea.input{resize:vertical;min-height:72px}
 #scan-overlay.open{display:flex}
 /* html5-qrcode reader fills the whole screen as background */
 #scan-reader{position:absolute;inset:0;overflow:hidden;background:#000}
-/* nuke every injected element except the video */
-#scan-reader *{border:none!important;background:transparent!important;padding:0!important;margin:0!important}
-#scan-reader video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important;display:block!important}
-/* hide all the library's own UI chrome */
+#scan-reader video{position:absolute!important;top:0!important;left:0!important;width:100%!important;height:100%!important;object-fit:cover!important;border:none!important;display:block!important}
+/* hide library UI chrome but NOT the video container divs */
 #scan-reader img{display:none!important}
 #scan-reader button{display:none!important}
 #scan-reader select{display:none!important}
 #scan-reader span{display:none!important}
-#scan-reader div[style*="border"]{display:none!important}
+#scan-reader div[style*="border: 6px"]{display:none!important}
+#scan-reader div[style*="border:6px"]{display:none!important}
 /* our custom UI sits on top */
 .scan-ui{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;height:100%;padding:20px;pointer-events:none}
 .scan-ui>*{pointer-events:auto}
@@ -1657,9 +1656,9 @@ async function startScan(mode) {
     );
     scannerStarted = true;
 
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    scanVideoTrack = stream.getVideoTracks()[0];
-    stream.getTracks().forEach(t => t.stop());
+    // Force the library's internal container to fill the reader div
+    const readerDiv = document.querySelector('#scan-reader > div');
+    if (readerDiv) readerDiv.style.cssText = 'width:100%!important;height:100%!important;padding:0!important;border:none!important;';
 
   } catch(e) {
     closeScan();
