@@ -225,17 +225,8 @@ textarea.input{resize:vertical;min-height:72px}
 /* ── SCAN OVERLAY ── */
 #scan-overlay{position:absolute;inset:0;background:#000;z-index:200;display:none;flex-direction:column}
 #scan-overlay.open{display:flex}
-/* html5-qrcode reader fills the whole screen as background */
-#scan-reader{position:absolute;inset:0;overflow:hidden;background:#000}
-#scan-reader video{position:absolute!important;top:0!important;left:0!important;width:100%!important;height:100%!important;object-fit:cover!important;border:none!important;display:block!important}
-/* hide library UI chrome but NOT the video container divs */
-#scan-reader img{display:none!important}
-#scan-reader button{display:none!important}
-#scan-reader select{display:none!important}
-#scan-reader span{display:none!important}
-#scan-reader div[style*="border: 6px"]{display:none!important}
-#scan-reader div[style*="border:6px"]{display:none!important}
-/* our custom UI sits on top */
+#scan-reader{display:none}
+#scan-video-el{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;background:#000}
 .scan-ui{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;height:100%;padding:20px;pointer-events:none}
 .scan-ui>*{pointer-events:auto}
 .scan-top{display:flex;justify-content:space-between;align-items:center}
@@ -350,6 +341,7 @@ textarea.input{resize:vertical;min-height:72px}
 
   <!-- Scan overlay -->
   <div id="scan-overlay">
+    <video id="scan-video-el" autoplay playsinline muted></video>
     <div id="scan-reader"></div>
     <div class="scan-ui">
       <div class="scan-top">
@@ -1622,11 +1614,12 @@ async function doConsumedThrown(invId, productId, qty) {
 }
 
 // ════════════════════════════════════════════════════════
-//  SCAN / CAMERA
+//  SCAN / CAMERA — raw getUserMedia for video display,
+//  BarcodeDetector API (modern) or html5-qrcode canvas fallback
 // ════════════════════════════════════════════════════════
-let html5Scanner = null;
+let scanStream = null;
+let scanAnimFrame = null;
 let torchOn = false;
-let scanVideoTrack = null;
 let scannerStarted = false;
 
 async function startScan(mode) {
@@ -1646,19 +1639,23 @@ async function startScan(mode) {
   document.getElementById('torch-btn').classList.remove('on');
 
   try {
-    html5Scanner = new Html5Qrcode('scan-reader', { verbose: false });
-    await html5Scanner.start(
-      { facingMode: 'environment' },
-      { fps: 12, qrbox: { width: 220, height: 220 },
-        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
-      },
-      (barcode) => { onBarcodeFound(barcode); }
-    );
+    scanStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+
+    const video = document.getElementById('scan-video-el');
+    video.srcObject = scanStream;
+    await video.play();
     scannerStarted = true;
 
-    // Force the library's internal container to fill the reader div
-    const readerDiv = document.querySelector('#scan-reader > div');
-    if (readerDiv) readerDiv.style.cssText = 'width:100%!important;height:100%!important;padding:0!important;border:none!important;';
+    // Use BarcodeDetector if available (Chrome Android, Safari 17+)
+    if ('BarcodeDetector' in window) {
+      startBarcodeDetector(video);
+    } else {
+      // Fallback: canvas + html5-qrcode decode
+      startCanvasDecode(video);
+    }
 
   } catch(e) {
     closeScan();
@@ -1666,24 +1663,89 @@ async function startScan(mode) {
   }
 }
 
-async function closeScan() {
-  torchOn = false;
-  scanVideoTrack = null;
-  if (html5Scanner && scannerStarted) {
-    try { await html5Scanner.stop(); } catch(e) {}
-    try { html5Scanner.clear(); } catch(e) {}
-    html5Scanner = null;
-    scannerStarted = false;
+function startBarcodeDetector(video) {
+  const detector = new BarcodeDetector({ formats: [
+    'ean_13','ean_8','upc_a','upc_e','code_128','code_39','qr_code','data_matrix'
+  ]});
+
+  async function detect() {
+    if (!scannerStarted) return;
+    try {
+      const codes = await detector.detect(video);
+      if (codes.length > 0) {
+        onBarcodeFound(codes[0].rawValue);
+        return;
+      }
+    } catch(e) {}
+    scanAnimFrame = requestAnimationFrame(detect);
   }
+  scanAnimFrame = requestAnimationFrame(detect);
+}
+
+function startCanvasDecode(video) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  async function decode() {
+    if (!scannerStarted) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      try {
+        await new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = async () => {
+            try {
+              const tmp = new Html5Qrcode('scan-reader', { verbose: false });
+              const result = await tmp.scanFile(new File([
+                await (await fetch(canvas.toDataURL())).blob()
+              ], 'frame.png'), false);
+              resolve(result);
+            } catch(e) { reject(e); }
+          };
+          img.src = canvas.toDataURL();
+        }).then(result => {
+          if (result) onBarcodeFound(result);
+        });
+      } catch(e) {}
+    }
+    scanAnimFrame = requestAnimationFrame(decode);
+  }
+
+  // Html5Qrcode canvas decode is heavy — throttle to ~4fps
+  let last = 0;
+  function throttledDecode(ts) {
+    if (!scannerStarted) return;
+    if (ts - last > 250) {
+      last = ts;
+      decode();
+    } else {
+      scanAnimFrame = requestAnimationFrame(throttledDecode);
+    }
+  }
+  scanAnimFrame = requestAnimationFrame(throttledDecode);
+}
+
+async function closeScan() {
+  scannerStarted = false;
+  torchOn = false;
+  if (scanAnimFrame) { cancelAnimationFrame(scanAnimFrame); scanAnimFrame = null; }
+  if (scanStream) {
+    scanStream.getTracks().forEach(t => t.stop());
+    scanStream = null;
+  }
+  const video = document.getElementById('scan-video-el');
+  video.srcObject = null;
   document.getElementById('scan-overlay').classList.remove('open');
 }
 
 function toggleTorch() {
-  if (!html5Scanner || !scannerStarted) return;
+  if (!scanStream) return;
+  const track = scanStream.getVideoTracks()[0];
+  if (!track) return;
   torchOn = !torchOn;
-  html5Scanner.applyVideoConstraints({ advanced: [{ torch: torchOn }] }).catch(() => {
-    torchOn = false;
-  });
+  track.applyConstraints({ advanced: [{ torch: torchOn }] }).catch(() => { torchOn = false; });
   document.getElementById('torch-btn').classList.toggle('on', torchOn);
 }
 
