@@ -37,17 +37,23 @@ a{text-decoration:none;color:inherit}
 .spinner{width:32px;height:32px;border:3px solid var(--green-l);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-/* ── SETUP SCREEN ── */
-#setup{position:absolute;inset:0;background:var(--surface);z-index:998;padding:32px 24px;overflow-y:auto}
-#setup h1{font-size:24px;font-weight:800;color:var(--green);margin-bottom:6px}
-#setup p{color:var(--text2);font-size:14px;margin-bottom:20px}
-#setup ol{padding-left:20px;color:var(--text2);font-size:14px;line-height:2}
-#setup code{background:var(--bg);padding:2px 6px;border-radius:4px;font-family:monospace;font-size:13px;color:var(--green-d)}
-.setup-inputs{margin-top:24px;display:flex;flex-direction:column;gap:12px}
-.setup-inputs label{font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px}
-.setup-inputs input{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:14px;outline:none;transition:.2s}
-.setup-inputs input:focus{border-color:var(--green)}
-.sql-block{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px;margin:16px 0;font-family:monospace;font-size:11px;color:var(--text2);white-space:pre-wrap;overflow-x:auto;line-height:1.6;max-height:200px;overflow-y:auto}
+/* ── LOGIN SCREEN ── */
+#login{position:absolute;inset:0;background:var(--bg);z-index:998;display:none;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px}
+.login-logo{font-size:48px;margin-bottom:10px;text-align:center}
+.login-title{font-size:26px;font-weight:800;color:var(--green);text-align:center;margin-bottom:4px}
+.login-sub{font-size:13px;color:var(--text3);text-align:center;margin-bottom:32px}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px 24px;width:100%;max-width:360px;box-shadow:var(--shadow)}
+.login-tabs{display:flex;background:var(--bg);border-radius:var(--r-sm);padding:3px;gap:3px;margin-bottom:20px}
+.login-tab{flex:1;padding:9px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;background:transparent;color:var(--text2)}
+.login-tab.active{background:var(--surface);color:var(--green);box-shadow:var(--shadow)}
+.login-field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.login-field label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
+.login-field input{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:15px;font-weight:500;color:var(--text);background:var(--surface2);outline:none;transition:.15s;-webkit-appearance:none}
+.login-field input:focus{border-color:var(--green);background:var(--surface)}
+.login-btn{width:100%;padding:14px;background:var(--green);color:#fff;border:none;border-radius:var(--r-sm);font-size:15px;font-weight:700;cursor:pointer;transition:.15s;margin-top:4px;font-family:var(--font)}
+.login-btn:active{background:var(--green-d)}
+.login-btn:disabled{opacity:.6;cursor:default}
+.login-error{font-size:13px;color:var(--red);text-align:center;margin-top:12px;min-height:18px}
 
 /* ── MAIN APP ── */
 #main-app{display:none;flex-direction:column;height:100%}
@@ -232,7 +238,6 @@ textarea.input{resize:vertical;min-height:72px}
 .scan-frame::before,.scan-frame::after{content:'';position:absolute;width:24px;height:24px;border-color:#fff;border-style:solid;border-width:0}
 .scan-frame::before{top:-2px;left:-2px;border-top-width:3px;border-left-width:3px;border-radius:8px 0 0 0}
 .scan-frame::after{bottom:-2px;right:-2px;border-bottom-width:3px;border-right-width:3px;border-radius:0 0 8px 0}
-/* html5-qrcode overrides — hide its default UI, keep only the video */
 #scan-reader{position:absolute;inset:0;overflow:hidden}
 #scan-reader video{width:100%!important;height:100%!important;object-fit:cover!important;border:none!important}
 #scan-reader img{display:none!important}
@@ -315,28 +320,26 @@ textarea.input{resize:vertical;min-height:72px}
     <div class="spinner"></div>
   </div>
 
-  <!-- Setup screen (shown if Supabase not configured) -->
-  <div id="setup" style="display:none">
-    <h1>🥦 My Pantry Pal</h1>
-    <p>Connect to Supabase to sync data across all your devices.</p>
-    <strong style="font-size:13px;color:var(--text)">Step 1 — Create a free Supabase account</strong>
-    <p style="margin-top:4px">Go to <code>supabase.com</code>, sign up, and create a new project.</p>
-    <strong style="font-size:13px;color:var(--text);display:block;margin-top:12px">Step 2 — Run this SQL in Supabase → SQL Editor</strong>
-    <div class="sql-block" id="setup-sql"></div>
-    <strong style="font-size:13px;color:var(--text);display:block;margin-top:12px">Step 3 — Paste your keys below</strong>
-    <p style="margin-top:4px">Go to Supabase → Settings → API to find your URL and anon key.</p>
-    <div class="setup-inputs">
-      <div>
-        <label>Supabase Project URL</label>
-        <input id="setup-url" placeholder="https://xxxx.supabase.co" class="input">
+  <!-- Login screen -->
+  <div id="login">
+    <div class="login-logo">🥦</div>
+    <div class="login-title">My Pantry Pal</div>
+    <div class="login-sub">Sign in to access your pantry</div>
+    <div class="login-card">
+      <div class="login-tabs">
+        <button class="login-tab active" id="tab-signin" onclick="switchLoginTab('signin')">Sign In</button>
+        <button class="login-tab" id="tab-signup" onclick="switchLoginTab('signup')">Sign Up</button>
       </div>
-      <div>
-        <label>Supabase Anon Key</label>
-        <input id="setup-key" placeholder="eyJ..." class="input">
+      <div class="login-field">
+        <label>Email</label>
+        <input type="email" id="login-email" placeholder="you@email.com" autocomplete="email">
       </div>
-      <button class="btn btn-primary btn-full" onclick="saveSetup()" style="margin-top:4px">
-        Connect & Start
-      </button>
+      <div class="login-field">
+        <label>Password</label>
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitLogin()">
+      </div>
+      <button class="login-btn" id="login-submit-btn" onclick="submitLogin()">Sign In</button>
+      <div class="login-error" id="login-error"></div>
     </div>
   </div>
 
@@ -412,13 +415,12 @@ textarea.input{resize:vertical;min-height:72px}
 </div>
 
 <script>
-const SUPABASE_URL = https://ibsskniwhxelnkbfnulq.supabase.co  ;
-const SUPABASE_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlic3Nrbml3aHhlbG5rYmZudWxxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NjA2NjYsImV4cCI6MjA5NzUzNjY2Nn0.aHLe0dqQzWyl11lVo8AE1UDUWLuyeokZ24NDpalPNrc
-;
-  
 // ════════════════════════════════════════════════════════
-//  CONFIG — paste your Supabase credentials here
+//  CONFIG — hardcoded Supabase credentials
 // ════════════════════════════════════════════════════════
+const SUPABASE_URL = "https://ibsskniwhxelnkbfnulq.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlic3Nrbml3aHhlbG5rYmZudWxxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NjA2NjYsImV4cCI6MjA5NzUzNjY2Nn0.aHLe0dqQzWyl11lVo8AE1UDUWLuyeokZ24NDpalPNrc";
+
 const SETUP_SQL = `
 -- Run in Supabase → SQL Editor
 
@@ -495,18 +497,17 @@ const DEFAULT_CATS = ['CONDIMENTS','DRINKS','FROZEN','MISC','PROCESSED','PRODUCE
 // ════════════════════════════════════════════════════════
 const S = {
   tab: 'home',
-  inventory: [],   // {id,product_id,quantity,expiration_date,name,barcode,category}
+  inventory: [],
   logs: [],
   categories: [],
-  snoozes: {},     // inventoryId -> snoozeUntil
-  lsSnoozes: {},   // productId -> snoozeUntil
+  snoozes: {},
+  lsSnoozes: {},
   utilities: [],
   alertDays: 7,
   lowStockQty: 2,
 
-  // flow
-  flow: null,      // null | 'ADD_FORM' | 'ADD_CONFIRM' | 'CONSUME_FORM' | 'CONSUME_ERR'
-  scanMode: null,  // 'add' | 'consume'
+  flow: null,
+  scanMode: null,
   barcode: '',
   fName: '', fCat: 'MISC', fQty: 1,
   fExpM: new Date().getMonth()+1,
@@ -515,11 +516,10 @@ const S = {
   fIsExisting: false, fProductId: null,
   cProductId: null, cTotalQty: 0, cQty: 1,
 
-  // UI
   search: '', filterCat: null, filterLow: false, filterExp: false,
   expanded: null,
   dashModal: null,
-  modal: null,  // current modal id
+  modal: null,
   editUtilId: null,
 };
 
@@ -533,21 +533,65 @@ function initSupabase(url, key) {
 }
 
 // ════════════════════════════════════════════════════════
-//  SETUP
+//  LOGIN
 // ════════════════════════════════════════════════════════
-document.getElementById('setup-sql').textContent = SETUP_SQL;
+let loginMode = 'signin';
 
-async function saveSetup() {
-  const url = document.getElementById('setup-url').value.trim();
-  const key = document.getElementById('setup-key').value.trim();
-  if (!url || !key) return alert('Please enter both URL and key.');
-  localStorage.setItem('pp_url', url);
-  localStorage.setItem('pp_key', key);
-  document.getElementById('setup').style.display = 'none';
-  document.getElementById('loading').style.display = 'flex';
-  initSupabase(url, key);
-  await loadAll();
-  startApp();
+function switchLoginTab(mode) {
+  loginMode = mode;
+  document.getElementById('tab-signin').classList.toggle('active', mode === 'signin');
+  document.getElementById('tab-signup').classList.toggle('active', mode === 'signup');
+  document.getElementById('login-submit-btn').textContent = mode === 'signin' ? 'Sign In' : 'Create Account';
+  document.getElementById('login-password').autocomplete = mode === 'signin' ? 'current-password' : 'new-password';
+  document.getElementById('login-error').textContent = '';
+}
+
+async function submitLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-submit-btn');
+
+  if (!email || !password) { errEl.textContent = 'Please enter your email and password.'; return; }
+
+  btn.disabled = true;
+  btn.textContent = loginMode === 'signin' ? 'Signing in…' : 'Creating account…';
+  errEl.textContent = '';
+
+  try {
+    let result;
+    if (loginMode === 'signin') {
+      result = await sb.auth.signInWithPassword({ email, password });
+    } else {
+      result = await sb.auth.signUp({ email, password });
+    }
+
+    if (result.error) {
+      errEl.textContent = result.error.message;
+      btn.disabled = false;
+      btn.textContent = loginMode === 'signin' ? 'Sign In' : 'Create Account';
+      return;
+    }
+
+    if (loginMode === 'signup' && !result.data.session) {
+      errEl.style.color = 'var(--green)';
+      errEl.textContent = 'Check your email to confirm your account, then sign in.';
+      btn.disabled = false;
+      btn.textContent = 'Create Account';
+      return;
+    }
+
+    // Signed in — load data and start app
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('loading').style.display = 'flex';
+    await loadAll();
+    startApp();
+
+  } catch(e) {
+    errEl.textContent = 'Something went wrong. Please try again.';
+    btn.disabled = false;
+    btn.textContent = loginMode === 'signin' ? 'Sign In' : 'Create Account';
+  }
 }
 
 // ════════════════════════════════════════════════════════
@@ -698,7 +742,6 @@ async function dbSaveSetting(key, value) {
   await sb.from('app_settings').upsert({ key, value: String(value) });
 }
 
-// Utilities
 async function dbAddUtility(util) {
   await sb.from('utilities').insert(util);
   await loadUtilities();
@@ -765,7 +808,6 @@ function render() {
   const thresh = now + S.alertDays * 86400000;
   const totals = productTotals();
 
-  // Badge counts
   const expCount = S.inventory.filter(i =>
     i.expiration_date <= thresh && (S.snoozes[i.id] || 0) < now
   ).length;
@@ -783,10 +825,8 @@ function render() {
   if (utilDue > 0) { ub.style.display = 'flex'; ub.textContent = utilDue > 99 ? '99+' : utilDue; }
   else ub.style.display = 'none';
 
-  // Nav active
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === S.tab));
 
-  // Tab content
   const tc = document.getElementById('tab-content');
   switch (S.tab) {
     case 'home':      tc.innerHTML = renderHome(totals, thresh, now); break;
@@ -796,7 +836,6 @@ function render() {
     case 'settings':  tc.innerHTML = renderSettings(); break;
   }
 
-  // Flow dialogs
   if (S.flow) {
     openModal(renderFlow());
   }
@@ -857,7 +896,6 @@ function renderInventory(totals, thresh, now) {
   if (S.filterLow) items = items.filter(i => (totals[i.product_id] || 0) <= S.lowStockQty);
   if (S.filterExp) items = items.filter(i => i.expiration_date <= thresh);
 
-  // Group by category -> product
   const grouped = {};
   items.forEach(i => {
     if (!grouped[i.category]) grouped[i.category] = {};
@@ -874,7 +912,6 @@ function renderInventory(totals, thresh, now) {
   cats.forEach(cat => {
     gridHTML += `<div class="cat-header">${esc(cat)}</div>`;
     const products = Object.entries(grouped[cat]);
-    // 2-column grid: pair products
     for (let pi = 0; pi < products.length; pi += 2) {
       gridHTML += `<div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:10px">`;
       for (let c = 0; c < 2; c++) {
@@ -1154,9 +1191,7 @@ function closeModal() {
   S.flow = null;
 }
 
-function overlayClick(e) {
-  // Don't close on backdrop click — user must use close/cancel buttons
-}
+function overlayClick(e) {}
 
 function renderFlow() {
   switch (S.flow) {
@@ -1582,7 +1617,7 @@ async function doConsumedThrown(invId, productId, qty) {
 }
 
 // ════════════════════════════════════════════════════════
-//  SCAN / CAMERA — works on iOS Safari + Android Chrome
+//  SCAN / CAMERA
 // ════════════════════════════════════════════════════════
 let html5Scanner = null;
 let torchOn = false;
@@ -1596,7 +1631,6 @@ async function startScan(mode) {
   S.fExpD = new Date().getDate();
   S.fExpY = new Date().getFullYear();
 
-  // Check camera permission available
   if (!navigator.mediaDevices?.getUserMedia) {
     showManualScan();
     return;
@@ -1618,10 +1652,9 @@ async function startScan(mode) {
     );
     scannerStarted = true;
 
-    // Grab video track for torch control (Android only)
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
     scanVideoTrack = stream.getVideoTracks()[0];
-    stream.getTracks().forEach(t => t.stop()); // stop the extra stream; html5Scanner has its own
+    stream.getTracks().forEach(t => t.stop());
 
   } catch(e) {
     closeScan();
@@ -1642,7 +1675,6 @@ async function closeScan() {
 }
 
 function toggleTorch() {
-  // Torch only works on Android Chrome — silently ignored on iOS
   if (!html5Scanner || !scannerStarted) return;
   torchOn = !torchOn;
   html5Scanner.applyVideoConstraints({ advanced: [{ torch: torchOn }] }).catch(() => {
@@ -1693,7 +1725,6 @@ async function onBarcodeFound(barcode) {
     S.flow = 'ADD_FORM';
     openModal(renderFlow());
   } else {
-    // consume
     const totals = productTotals();
     const item = S.inventory.find(i => i.barcode === barcode);
     if (!item) {
@@ -1857,30 +1888,43 @@ function setupRealtime() {
 // ════════════════════════════════════════════════════════
 function startApp() {
   document.getElementById('loading').style.display = 'none';
+  document.getElementById('login').style.display = 'none';
   const app = document.getElementById('main-app');
   app.style.display = 'flex';
   setupRealtime();
   render();
 }
 
+function showLogin() {
+  document.getElementById('loading').style.display = 'none';
+  const loginEl = document.getElementById('login');
+  loginEl.style.display = 'flex';
+}
+
 async function init() {
-  const url = localStorage.getItem('pp_url');
-  const key = localStorage.getItem('pp_key');
+  initSupabase(SUPABASE_URL, SUPABASE_KEY);
 
-  if (!url || !key || url === 'YOUR_SUPABASE_URL') {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('setup').style.display = 'block';
-    return;
+  // Check if user already has a session
+  const { data: { session } } = await sb.auth.getSession();
+
+  if (session) {
+    try {
+      await loadAll();
+      startApp();
+    } catch(e) {
+      showLogin();
+    }
+  } else {
+    showLogin();
   }
 
-  initSupabase(url, key);
-  try {
-    await loadAll();
-    startApp();
-  } catch(e) {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('setup').style.display = 'block';
-  }
+  // Listen for auth state changes (e.g. session expiry)
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT') {
+      document.getElementById('main-app').style.display = 'none';
+      showLogin();
+    }
+  });
 }
 
 init();
