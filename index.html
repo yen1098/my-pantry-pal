@@ -225,10 +225,8 @@ textarea.input{resize:vertical;min-height:72px}
 /* ── SCAN OVERLAY ── */
 #scan-overlay{position:absolute;inset:0;background:#000;z-index:200;display:none;flex-direction:column}
 #scan-overlay.open{display:flex}
-#scan-reader{position:absolute;inset:0;overflow:hidden}
-#scan-reader video{position:absolute!important;top:0!important;left:0!important;width:100%!important;height:100%!important;object-fit:cover!important}
-.scan-ui{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;height:100%;padding:20px;pointer-events:none}
-.scan-ui>*{pointer-events:auto}
+#scan-video{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
+.scan-ui{position:relative;z-index:1;display:flex;flex-direction:column;height:100%;padding:20px}
 .scan-top{display:flex;justify-content:space-between;align-items:center}
 .scan-torch-btn{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;border:none;cursor:pointer}
 .scan-torch-btn svg{width:20px;height:20px;stroke:#fff}
@@ -236,10 +234,17 @@ textarea.input{resize:vertical;min-height:72px}
 .scan-torch-btn.on svg{stroke:#FFD700}
 .scan-cancel{font-size:16px;font-weight:600;color:#fff;background:transparent;border:none;cursor:pointer}
 .scan-middle{flex:1;display:flex;align-items:center;justify-content:center}
-.scan-frame{width:230px;height:230px;border:2px solid rgba(255,255,255,.7);border-radius:20px;position:relative;pointer-events:none}
+.scan-frame{width:230px;height:230px;border:2px solid rgba(255,255,255,.7);border-radius:20px;position:relative}
 .scan-frame::before,.scan-frame::after{content:'';position:absolute;width:24px;height:24px;border-color:#fff;border-style:solid;border-width:0}
 .scan-frame::before{top:-2px;left:-2px;border-top-width:3px;border-left-width:3px;border-radius:8px 0 0 0}
 .scan-frame::after{bottom:-2px;right:-2px;border-bottom-width:3px;border-right-width:3px;border-radius:0 0 8px 0}
+/* html5-qrcode overrides — hide its default UI, keep only the video */
+#scan-reader{position:absolute;inset:0;overflow:hidden}
+#scan-reader video{width:100%!important;height:100%!important;object-fit:cover!important;border:none!important}
+#scan-reader img{display:none!important}
+#scan-reader button{display:none!important}
+#scan-reader select{display:none!important}
+#scan-reader>div>div:not([style*="border"]){display:none!important}
 .scan-bottom{text-align:center;padding-bottom:20px}
 .scan-hint{color:rgba(255,255,255,.7);font-size:13px;margin-bottom:14px}
 .scan-manual-btn{background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.4);color:#fff;padding:11px 22px;border-radius:var(--r-sm);font-size:14px;font-weight:600;cursor:pointer}
@@ -1613,10 +1618,11 @@ async function doConsumedThrown(invId, productId, qty) {
 }
 
 // ════════════════════════════════════════════════════════
-//  SCAN / CAMERA
+//  SCAN / CAMERA — works on iOS Safari + Android Chrome
 // ════════════════════════════════════════════════════════
 let html5Scanner = null;
 let torchOn = false;
+let scanVideoTrack = null;
 let scannerStarted = false;
 
 async function startScan(mode) {
@@ -1646,6 +1652,12 @@ async function startScan(mode) {
       (barcode) => { onBarcodeFound(barcode); }
     );
     scannerStarted = true;
+
+    // Grab video track for torch control (Android only)
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    scanVideoTrack = stream.getVideoTracks()[0];
+    stream.getTracks().forEach(t => t.stop());
+
   } catch(e) {
     closeScan();
     showManualScan();
@@ -1654,6 +1666,7 @@ async function startScan(mode) {
 
 async function closeScan() {
   torchOn = false;
+  scanVideoTrack = null;
   if (html5Scanner && scannerStarted) {
     try { await html5Scanner.stop(); } catch(e) {}
     try { html5Scanner.clear(); } catch(e) {}
@@ -1666,7 +1679,9 @@ async function closeScan() {
 function toggleTorch() {
   if (!html5Scanner || !scannerStarted) return;
   torchOn = !torchOn;
-  html5Scanner.applyVideoConstraints({ advanced: [{ torch: torchOn }] }).catch(() => { torchOn = false; });
+  html5Scanner.applyVideoConstraints({ advanced: [{ torch: torchOn }] }).catch(() => {
+    torchOn = false;
+  });
   document.getElementById('torch-btn').classList.toggle('on', torchOn);
 }
 
