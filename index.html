@@ -144,7 +144,7 @@ textarea.input{resize:vertical;min-height:72px}
 .inv-grid .cat-header{grid-column:1/-1;font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.08em;padding-top:8px}
 .tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px;cursor:pointer;transition:.12s;box-shadow:var(--shadow)}
 .tile:active{transform:scale(.98)}
-.tile.expanded{grid-column:1/-1;border-color:var(--green-b);border-left:3px solid var(--green)}
+.tile.expanded{border-color:var(--green-b);border-left:3px solid var(--green)}
 .tile-name{font-size:14px;font-weight:700;color:var(--text);line-height:1.3;margin-bottom:2px}
 .tile-barcode{font-size:10px;color:var(--text3);margin-bottom:4px;font-family:monospace}
 .tile-qty{font-size:12px;color:var(--text2);font-weight:500}
@@ -801,7 +801,7 @@ function esc(s) {
 // ════════════════════════════════════════════════════════
 //  RENDER
 // ════════════════════════════════════════════════════════
-function render() {
+async function render() {
   const now = Date.now();
   const thresh = now + S.alertDays * 86400000;
   const totals = productTotals();
@@ -831,7 +831,7 @@ function render() {
     case 'inventory': tc.innerHTML = renderInventory(totals, thresh, now); break;
     case 'alerts':    tc.innerHTML = renderAlerts(totals, thresh, now); break;
     case 'utilities': tc.innerHTML = renderUtilities(); break;
-    case 'settings':  tc.innerHTML = renderSettings(); break;
+    case 'settings':  tc.innerHTML = await renderSettings(); break;
   }
 
   if (S.flow) {
@@ -1115,7 +1115,7 @@ function renderUtilities() {
 }
 
 // ── SETTINGS ──
-function renderSettings() {
+async function renderSettings() {
   const cats = allCats();
   return `
   <div class="screen">
@@ -1172,6 +1172,15 @@ function renderSettings() {
           <input type="file" accept=".csv" style="display:none" onchange="importCSV(this)">
         </label>
       </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>Account</h3>
+      <p>Signed in as ${esc((await sb.auth.getUser()).data.user?.email || '')}</p>
+      <button class="btn btn-danger btn-full" onclick="confirmLogout()" style="display:flex;align-items:center;gap:8px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px;height:16px"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-width="2" stroke-linecap="round"/><polyline points="16 17 21 12 16 7" stroke-width="2" stroke-linecap="round"/><line x1="21" y1="12" x2="9" y2="12" stroke-width="2" stroke-linecap="round"/></svg>
+        Sign Out
+      </button>
     </div>
   </div>`;
 }
@@ -1880,6 +1889,29 @@ function setupRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'low_stock_snooze' }, loadSnoozes)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'utilities' }, loadUtilities)
     .subscribe();
+}
+
+// ════════════════════════════════════════════════════════
+//  LOGOUT
+// ════════════════════════════════════════════════════════
+function confirmLogout() {
+  openModal(`
+  <div class="confirm-icon">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-width="2" stroke-linecap="round" stroke="var(--red)"/><polyline points="16 17 21 12 16 7" stroke-width="2" stroke-linecap="round" stroke="var(--red)"/><line x1="21" y1="12" x2="9" y2="12" stroke-width="2" stroke-linecap="round" stroke="var(--red)"/></svg>
+  </div>
+  <p class="confirm-q">Sign out?</p>
+  <p class="confirm-sub">You'll need to sign in again to access your pantry.</p>
+  <div class="btn-row">
+    <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+    <button class="btn btn-danger" onclick="doLogout()">Sign Out</button>
+  </div>`);
+}
+
+async function doLogout() {
+  closeModal();
+  await sb.auth.signOut();
+  document.getElementById('main-app').style.display = 'none';
+  showLogin();
 }
 
 // ════════════════════════════════════════════════════════
