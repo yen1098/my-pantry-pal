@@ -225,14 +225,8 @@ textarea.input{resize:vertical;min-height:72px}
 /* ── SCAN OVERLAY ── */
 #scan-overlay{position:absolute;inset:0;background:#000;z-index:200;display:none;flex-direction:column}
 #scan-overlay.open{display:flex}
-#scan-reader{position:absolute;inset:0;overflow:hidden;display:flex;align-items:center;justify-content:center}
-#scan-reader video{position:absolute!important;top:50%!important;left:50%!important;transform:translate(-50%,-50%)!important;min-width:100%!important;min-height:100%!important;width:auto!important;height:auto!important;object-fit:cover!important;border:none!important}
-#scan-reader img{display:none!important}
-#scan-reader button{display:none!important}
-#scan-reader select{display:none!important}
-#scan-reader span{display:none!important}
-#scan-reader>div{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;padding:0!important;border:none!important;background:transparent!important;display:flex!important;align-items:center!important;justify-content:center!important}
-#scan-reader>div>div{border:none!important;background:transparent!important}
+#scan-reader{position:absolute;inset:0;overflow:hidden}
+#scan-reader video{position:absolute!important;top:0!important;left:0!important;width:100%!important;height:100%!important;object-fit:cover!important}
 .scan-ui{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;height:100%;padding:20px;pointer-events:none}
 .scan-ui>*{pointer-events:auto}
 .scan-top{display:flex;justify-content:space-between;align-items:center}
