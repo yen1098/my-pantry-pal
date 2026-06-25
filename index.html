@@ -226,9 +226,9 @@ textarea.input{resize:vertical;min-height:72px}
 #scan-overlay{position:absolute;inset:0;background:#000;z-index:200;display:none;flex-direction:column}
 #scan-overlay.open{display:flex}
 #scan-video{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
-/* force library container to fill entire screen */
-#scan-reader{position:absolute;inset:0;overflow:hidden}
-#scan-reader>div{height:100%!important}
+/* force library container to fill entire screen including iOS safe area */
+#scan-reader{position:absolute;top:0;left:0;width:100%;height:100%;height:100dvh;overflow:hidden}
+#scan-reader>div{height:100%!important;min-height:100%!important}
 #scan-reader video{width:100%!important;height:100%!important;object-fit:cover!important;border:none!important}
 #scan-reader img{display:none!important}
 #scan-reader button{display:none!important}
@@ -243,7 +243,13 @@ textarea.input{resize:vertical;min-height:72px}
 .scan-torch-btn.on{background:rgba(255,215,0,.45)}
 .scan-torch-btn.on svg{stroke:#FFD700}
 .scan-cancel{font-size:16px;font-weight:600;color:#fff;background:rgba(0,0,0,.3);padding:8px 16px;border-radius:99px;border:none;cursor:pointer}
-.scan-middle{flex:1;pointer-events:none}
+.scan-middle{flex:1;pointer-events:none;display:flex;align-items:center;justify-content:center}
+.scan-frame{width:240px;height:240px;position:relative;pointer-events:none}
+.scan-frame::before,.scan-frame::after,.scan-frame .corner-br,.scan-frame .corner-tl-b{content:'';position:absolute;width:28px;height:28px;border-color:rgba(255,255,255,.9);border-style:solid;border-width:0}
+.scan-frame::before{top:0;left:0;border-top-width:3px;border-left-width:3px;border-radius:6px 0 0 0}
+.scan-frame::after{top:0;right:0;border-top-width:3px;border-right-width:3px;border-radius:0 6px 0 0}
+.scan-frame .corner-bl{position:absolute;bottom:0;left:0;width:28px;height:28px;border-color:rgba(255,255,255,.9);border-style:solid;border-width:0;border-bottom-width:3px;border-left-width:3px;border-radius:0 0 0 6px}
+.scan-frame .corner-br{position:absolute;bottom:0;right:0;width:28px;height:28px;border-color:rgba(255,255,255,.9);border-style:solid;border-width:0;border-bottom-width:3px;border-right-width:3px;border-radius:0 0 6px 0}
 .scan-bottom{text-align:center;padding-bottom:32px}
 .scan-hint{color:rgba(255,255,255,.8);font-size:13px;margin-bottom:14px;text-shadow:0 1px 3px rgba(0,0,0,.6)}
 .scan-manual-btn{background:rgba(0,0,0,.4);border:1.5px solid rgba(255,255,255,.4);color:#fff;padding:11px 22px;border-radius:var(--r-sm);font-size:14px;font-weight:600;cursor:pointer}
@@ -353,7 +359,12 @@ textarea.input{resize:vertical;min-height:72px}
         </button>
         <button class="scan-cancel" onclick="closeScan()">Cancel</button>
       </div>
-      <div class="scan-middle"></div>
+      <div class="scan-middle">
+        <div class="scan-frame">
+          <div class="corner-bl"></div>
+          <div class="corner-br"></div>
+        </div>
+      </div>
       <div class="scan-bottom">
         <p class="scan-hint">Point camera at barcode</p>
         <button class="scan-manual-btn" onclick="showManualScan()">Enter code manually</button>
@@ -1324,13 +1335,39 @@ function submitAddForm() {
 }
 
 function promptNewCategory() {
-  const name = prompt('Enter new category name:');
-  if (!name?.trim()) return;
-  dbAddCategory(name).then(() => {
-    S.fCat = name.trim().toUpperCase();
-    S.flow = 'ADD_FORM';
-    openModal(renderFlow());
-  });
+  // Save current form state before showing the new category modal
+  const nameEl = document.getElementById('f-name');
+  const expEl = document.getElementById('f-exp');
+  if (nameEl) S.fName = nameEl.value.trim();
+  if (expEl) {
+    const parts = expEl.value.split('-');
+    if (parts.length === 3) { S.fExpY = +parts[0]; S.fExpM = +parts[1]; S.fExpD = +parts[2]; }
+  }
+  openModal(`
+  <div class="modal-title-row">
+    <span class="modal-title">New Category</span>
+    <button class="modal-close" onclick="S.flow='ADD_FORM';openModal(renderFlow())">
+      <svg viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round" stroke-width="2"/></svg>
+    </button>
+  </div>
+  <div class="field">
+    <label>Category Name</label>
+    <input class="input" id="new-cat-modal-input" placeholder="e.g. BAKERY" style="text-transform:uppercase" autofocus>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-outline" onclick="S.flow='ADD_FORM';openModal(renderFlow())">← Back</button>
+    <button class="btn btn-primary" onclick="submitNewCategoryModal()">Add & Select</button>
+  </div>`);
+}
+
+async function submitNewCategoryModal() {
+  const inp = document.getElementById('new-cat-modal-input');
+  const name = inp?.value?.trim().toUpperCase();
+  if (!name) { inp?.focus(); return; }
+  await dbAddCategory(name);
+  S.fCat = name;
+  S.flow = 'ADD_FORM';
+  openModal(renderFlow());
 }
 
 // ── ADD CONFIRM ──
@@ -1683,7 +1720,7 @@ async function startScan(mode) {
       { facingMode: 'environment' },
       { fps: 12, qrbox: { width: 220, height: 220 },
         supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-        aspectRatio: window.innerHeight / window.innerWidth
+        aspectRatio: window.screen.height / window.screen.width
       },
       (barcode) => { onBarcodeFound(barcode); }
     );
