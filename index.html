@@ -225,10 +225,13 @@ textarea.input{resize:vertical;min-height:72px}
 /* ── SCAN OVERLAY ── */
 #scan-overlay{position:absolute;inset:0;background:#000;z-index:200;display:none;flex-direction:column}
 #scan-overlay.open{display:flex}
-/* our own video fills the screen cleanly */
-#scan-preview{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
-/* library hidden — scans in background only */
-#scan-reader{position:fixed;left:-9999px;top:-9999px;width:320px;height:320px;visibility:hidden}
+#scan-reader{position:absolute;inset:0;overflow:hidden}
+#scan-reader>div{height:100%!important}
+#scan-reader video{width:100%!important;height:100%!important;object-fit:cover!important;border:none!important}
+#scan-reader img{display:none!important}
+#scan-reader button{display:none!important}
+#scan-reader select{display:none!important}
+#scan-reader>div>div:not([style*="border"]){display:none!important}
 .scan-ui{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;height:100%;padding:20px;pointer-events:none}
 .scan-ui>*{pointer-events:auto}
 .scan-top{display:flex;justify-content:space-between;align-items:center}
@@ -237,13 +240,7 @@ textarea.input{resize:vertical;min-height:72px}
 .scan-torch-btn.on{background:rgba(255,215,0,.45)}
 .scan-torch-btn.on svg{stroke:#FFD700}
 .scan-cancel{font-size:16px;font-weight:600;color:#fff;background:rgba(0,0,0,.3);padding:8px 16px;border-radius:99px;border:none;cursor:pointer}
-.scan-middle{flex:1;pointer-events:none;display:flex;align-items:center;justify-content:center}
-.scan-frame{width:260px;height:260px;position:relative;pointer-events:none;box-shadow:0 0 0 9999px rgba(0,0,0,0.5);border-radius:4px}
-.scan-frame::before,.scan-frame::after{content:'';position:absolute;width:24px;height:24px;border-color:#fff;border-style:solid;border-width:0}
-.scan-frame::before{top:-1px;left:-1px;border-top-width:3px;border-left-width:3px;border-radius:4px 0 0 0}
-.scan-frame::after{top:-1px;right:-1px;border-top-width:3px;border-right-width:3px;border-radius:0 4px 0 0}
-.scan-frame .corner-bl{position:absolute;bottom:-1px;left:-1px;width:24px;height:24px;border-color:#fff;border-style:solid;border-width:0;border-bottom-width:3px;border-left-width:3px;border-radius:0 0 0 4px}
-.scan-frame .corner-br{position:absolute;bottom:-1px;right:-1px;width:24px;height:24px;border-color:#fff;border-style:solid;border-width:0;border-bottom-width:3px;border-right-width:3px;border-radius:0 0 4px 0}
+.scan-middle{flex:1;pointer-events:none}
 .scan-bottom{text-align:center;padding-bottom:32px}
 .scan-hint{color:rgba(255,255,255,.8);font-size:13px;margin-bottom:14px;text-shadow:0 1px 3px rgba(0,0,0,.6)}
 .scan-manual-btn{background:rgba(0,0,0,.4);border:1.5px solid rgba(255,255,255,.4);color:#fff;padding:11px 22px;border-radius:var(--r-sm);font-size:14px;font-weight:600;cursor:pointer}
@@ -345,7 +342,6 @@ textarea.input{resize:vertical;min-height:72px}
 
   <!-- Scan overlay -->
   <div id="scan-overlay">
-    <video id="scan-preview" autoplay playsinline muted></video>
     <div id="scan-reader"></div>
     <div class="scan-ui">
       <div class="scan-top">
@@ -354,12 +350,7 @@ textarea.input{resize:vertical;min-height:72px}
         </button>
         <button class="scan-cancel" onclick="closeScan()">Cancel</button>
       </div>
-      <div class="scan-middle">
-        <div class="scan-frame">
-          <div class="corner-bl"></div>
-          <div class="corner-br"></div>
-        </div>
-      </div>
+      <div class="scan-middle"></div>
       <div class="scan-bottom">
         <p class="scan-hint">Point camera at barcode</p>
         <button class="scan-manual-btn" onclick="showManualScan()">Enter code manually</button>
@@ -1689,8 +1680,6 @@ async function doConsumedThrown(invId, productId, qty) {
 //  SCAN / CAMERA
 // ════════════════════════════════════════════════════════
 let html5Scanner = null;
-let scanPreviewStream = null;
-let torchTrack = null;
 let torchOn = false;
 let scannerStarted = false;
 
@@ -1708,7 +1697,6 @@ async function startScan(mode) {
   document.getElementById('torch-btn').classList.remove('on');
 
   try {
-    // Start library scanner (it manages the stream internally)
     html5Scanner = new Html5Qrcode('scan-reader', { verbose: false });
     await html5Scanner.start(
       { facingMode: 'environment' },
@@ -1719,24 +1707,6 @@ async function startScan(mode) {
       (barcode) => { onBarcodeFound(barcode); }
     );
     scannerStarted = true;
-
-    // Mirror the library's video stream to our visible preview element
-    const libVideo = document.querySelector('#scan-reader video');
-    const preview = document.getElementById('scan-preview');
-    if (libVideo && preview) {
-      // Wait for library video to have a stream
-      const waitForStream = () => {
-        if (libVideo.srcObject) {
-          scanPreviewStream = libVideo.srcObject;
-          preview.srcObject = scanPreviewStream;
-          torchTrack = scanPreviewStream.getVideoTracks()[0];
-        } else {
-          setTimeout(waitForStream, 50);
-        }
-      };
-      waitForStream();
-    }
-
   } catch(e) {
     closeScan();
     showManualScan();
@@ -1745,10 +1715,6 @@ async function startScan(mode) {
 
 async function closeScan() {
   torchOn = false;
-  torchTrack = null;
-  scanPreviewStream = null;
-  const preview = document.getElementById('scan-preview');
-  if (preview) preview.srcObject = null;
   if (html5Scanner && scannerStarted) {
     try { await html5Scanner.stop(); } catch(e) {}
     try { html5Scanner.clear(); } catch(e) {}
@@ -1759,9 +1725,9 @@ async function closeScan() {
 }
 
 function toggleTorch() {
-  if (!torchTrack) return;
+  if (!html5Scanner || !scannerStarted) return;
   torchOn = !torchOn;
-  torchTrack.applyConstraints({ advanced: [{ torch: torchOn }] }).catch(() => { torchOn = false; });
+  html5Scanner.applyVideoConstraints({ advanced: [{ torch: torchOn }] }).catch(() => { torchOn = false; });
   document.getElementById('torch-btn').classList.toggle('on', torchOn);
 }
 
