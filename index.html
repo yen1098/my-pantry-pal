@@ -225,16 +225,10 @@ textarea.input{resize:vertical;min-height:72px}
 /* ── SCAN OVERLAY ── */
 #scan-overlay{position:absolute;inset:0;background:#000;z-index:200;display:none;flex-direction:column}
 #scan-overlay.open{display:flex}
-#scan-video{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
-/* force library container to fill entire screen including iOS safe area */
-#scan-reader{position:absolute;top:0;left:0;width:100%;height:100%;height:100dvh;overflow:hidden}
-#scan-reader>div{height:100%!important;min-height:100%!important}
-#scan-reader video{width:100%!important;height:100%!important;object-fit:cover!important;border:none!important}
-#scan-reader img{display:none!important}
-#scan-reader button{display:none!important}
-#scan-reader select{display:none!important}
-#scan-reader>div>div:not([style*="border"]){display:none!important}
-/* our UI floats on top of the full screen */
+/* our own video fills the screen cleanly */
+#scan-preview{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+/* library hidden — scans in background only */
+#scan-reader{position:fixed;left:-9999px;top:-9999px;width:320px;height:320px;visibility:hidden}
 .scan-ui{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;height:100%;padding:20px;pointer-events:none}
 .scan-ui>*{pointer-events:auto}
 .scan-top{display:flex;justify-content:space-between;align-items:center}
@@ -250,8 +244,6 @@ textarea.input{resize:vertical;min-height:72px}
 .scan-frame::after{top:-1px;right:-1px;border-top-width:3px;border-right-width:3px;border-radius:0 4px 0 0}
 .scan-frame .corner-bl{position:absolute;bottom:-1px;left:-1px;width:24px;height:24px;border-color:#fff;border-style:solid;border-width:0;border-bottom-width:3px;border-left-width:3px;border-radius:0 0 0 4px}
 .scan-frame .corner-br{position:absolute;bottom:-1px;right:-1px;width:24px;height:24px;border-color:#fff;border-style:solid;border-width:0;border-bottom-width:3px;border-right-width:3px;border-radius:0 0 4px 0}
-/* hide ALL of the library's injected UI divs — keep only video */
-#scan-reader>div>div{display:none!important}
 .scan-bottom{text-align:center;padding-bottom:32px}
 .scan-hint{color:rgba(255,255,255,.8);font-size:13px;margin-bottom:14px;text-shadow:0 1px 3px rgba(0,0,0,.6)}
 .scan-manual-btn{background:rgba(0,0,0,.4);border:1.5px solid rgba(255,255,255,.4);color:#fff;padding:11px 22px;border-radius:var(--r-sm);font-size:14px;font-weight:600;cursor:pointer}
@@ -353,6 +345,7 @@ textarea.input{resize:vertical;min-height:72px}
 
   <!-- Scan overlay -->
   <div id="scan-overlay">
+    <video id="scan-preview" autoplay playsinline muted></video>
     <div id="scan-reader"></div>
     <div class="scan-ui">
       <div class="scan-top">
@@ -1693,11 +1686,12 @@ async function doConsumedThrown(invId, productId, qty) {
 }
 
 // ════════════════════════════════════════════════════════
-//  SCAN / CAMERA — works on iOS Safari + Android Chrome
+//  SCAN / CAMERA
 // ════════════════════════════════════════════════════════
 let html5Scanner = null;
+let scanPreviewStream = null;
+let torchTrack = null;
 let torchOn = false;
-let scanVideoTrack = null;
 let scannerStarted = false;
 
 async function startScan(mode) {
@@ -1707,16 +1701,23 @@ async function startScan(mode) {
   S.fExpD = new Date().getDate();
   S.fExpY = new Date().getFullYear();
 
-  if (!navigator.mediaDevices?.getUserMedia) {
-    showManualScan();
-    return;
-  }
+  if (!navigator.mediaDevices?.getUserMedia) { showManualScan(); return; }
 
   document.getElementById('scan-overlay').classList.add('open');
   torchOn = false;
   document.getElementById('torch-btn').classList.remove('on');
 
   try {
+    // Stream 1: visible full-screen preview
+    scanPreviewStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    const preview = document.getElementById('scan-preview');
+    preview.srcObject = scanPreviewStream;
+    torchTrack = scanPreviewStream.getVideoTracks()[0];
+
+    // Stream 2: library scans in hidden div (gets its own camera access)
     html5Scanner = new Html5Qrcode('scan-reader', { verbose: false });
     await html5Scanner.start(
       { facingMode: 'environment' },
@@ -1728,11 +1729,6 @@ async function startScan(mode) {
     );
     scannerStarted = true;
 
-    // Grab video track for torch control (Android only)
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    scanVideoTrack = stream.getVideoTracks()[0];
-    stream.getTracks().forEach(t => t.stop());
-
   } catch(e) {
     closeScan();
     showManualScan();
@@ -1741,7 +1737,13 @@ async function startScan(mode) {
 
 async function closeScan() {
   torchOn = false;
-  scanVideoTrack = null;
+  torchTrack = null;
+  if (scanPreviewStream) {
+    scanPreviewStream.getTracks().forEach(t => t.stop());
+    scanPreviewStream = null;
+  }
+  const preview = document.getElementById('scan-preview');
+  if (preview) preview.srcObject = null;
   if (html5Scanner && scannerStarted) {
     try { await html5Scanner.stop(); } catch(e) {}
     try { html5Scanner.clear(); } catch(e) {}
@@ -1752,11 +1754,9 @@ async function closeScan() {
 }
 
 function toggleTorch() {
-  if (!html5Scanner || !scannerStarted) return;
+  if (!torchTrack) return;
   torchOn = !torchOn;
-  html5Scanner.applyVideoConstraints({ advanced: [{ torch: torchOn }] }).catch(() => {
-    torchOn = false;
-  });
+  torchTrack.applyConstraints({ advanced: [{ torch: torchOn }] }).catch(() => { torchOn = false; });
   document.getElementById('torch-btn').classList.toggle('on', torchOn);
 }
 
