@@ -1708,16 +1708,7 @@ async function startScan(mode) {
   document.getElementById('torch-btn').classList.remove('on');
 
   try {
-    // Stream 1: visible full-screen preview
-    scanPreviewStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-      audio: false
-    });
-    const preview = document.getElementById('scan-preview');
-    preview.srcObject = scanPreviewStream;
-    torchTrack = scanPreviewStream.getVideoTracks()[0];
-
-    // Stream 2: library scans in hidden div (gets its own camera access)
+    // Start library scanner (it manages the stream internally)
     html5Scanner = new Html5Qrcode('scan-reader', { verbose: false });
     await html5Scanner.start(
       { facingMode: 'environment' },
@@ -1729,6 +1720,23 @@ async function startScan(mode) {
     );
     scannerStarted = true;
 
+    // Mirror the library's video stream to our visible preview element
+    const libVideo = document.querySelector('#scan-reader video');
+    const preview = document.getElementById('scan-preview');
+    if (libVideo && preview) {
+      // Wait for library video to have a stream
+      const waitForStream = () => {
+        if (libVideo.srcObject) {
+          scanPreviewStream = libVideo.srcObject;
+          preview.srcObject = scanPreviewStream;
+          torchTrack = scanPreviewStream.getVideoTracks()[0];
+        } else {
+          setTimeout(waitForStream, 50);
+        }
+      };
+      waitForStream();
+    }
+
   } catch(e) {
     closeScan();
     showManualScan();
@@ -1738,10 +1746,7 @@ async function startScan(mode) {
 async function closeScan() {
   torchOn = false;
   torchTrack = null;
-  if (scanPreviewStream) {
-    scanPreviewStream.getTracks().forEach(t => t.stop());
-    scanPreviewStream = null;
-  }
+  scanPreviewStream = null;
   const preview = document.getElementById('scan-preview');
   if (preview) preview.srcObject = null;
   if (html5Scanner && scannerStarted) {
